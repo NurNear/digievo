@@ -1,0 +1,16 @@
+.DS_Store
+Thumbs.db
+
+# Roblox/Rojo generated files
+*.rbxl
+*.rbxlx
+*.rbxm
+*.rbxmx
+
+# Tooling
+node_modules/
+.aftman/
+
+# Editor
+.vscode/
+.idea/

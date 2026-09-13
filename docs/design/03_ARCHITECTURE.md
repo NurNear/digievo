@@ -1,5 +1,7 @@
 # Architecture — current design baseline
 
+อัปเดตสถานะ 2026-09-12: มี Catalog/DomainRules ผ่าน Studio และเพิ่ม profile/lease/prepare/commit/recovery พร้อม backend จำลองและ test-online adapter แล้ว; online persistence ยังไม่ผ่านการทดสอบจริง ส่วน RPC/battle ยังเป็นแบบออกแบบ ดู [แผนงาน](07_TASKS.md)
+
 อัปเดต2026-09-11 รอบ13. ใช้ D-01–D-25 ใน [Domain Rules](06_DOMAIN_RULES.md) และ [PRD](01_PRD_REVIEW.md) เป็นกฎธุรกิจ; แบบต่อไปนี้เป็นแนวทางที่เลือกสำหรับ MVP ยังไม่ใช่ระบบที่สร้างหรือทดสอบแล้ว
 
 ## ขนาดและขอบเขต

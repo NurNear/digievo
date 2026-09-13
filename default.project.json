@@ -1,7 +1,39 @@
 {
-  "name": "Roblox",
+  "name": "RobloxMVP_LocalTest",
+  "serveAddress": "127.0.0.1",
+  "servePlaceIds": [0],
   "tree": {
     "$className": "DataModel",
+    "Workspace": {
+      "$className": "Workspace",
+      "Baseplate": {
+        "$className": "Part",
+        "$properties": {
+          "Anchored": true,
+          "Size": [160, 1, 160],
+          "Position": [0, -0.5, 0],
+          "Color": [0.32, 0.48, 0.38]
+        }
+      },
+      "Spawn": {
+        "$className": "SpawnLocation",
+        "$properties": {
+          "Anchored": true,
+          "Size": [8, 1, 8],
+          "Position": [0, 0.5, 0],
+          "Neutral": true
+        }
+      }
+    },
+    "ServerStorage": {
+      "$className": "ServerStorage",
+      "DomainRulesTests": {
+        "$path": "tests/DomainRules.spec.luau"
+      },
+      "PersistenceTests": {
+        "$path": "tests/Persistence.spec.luau"
+      }
+    },
     "ReplicatedStorage": {
       "$path": "src/ReplicatedStorage"
     },

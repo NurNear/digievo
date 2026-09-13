@@ -1,0 +1,5 @@
+local Catalog = require("../src/ReplicatedStorage/Shared/Catalog")
+local DomainRules = require("../src/ReplicatedStorage/Shared/DomainRules")
+local Suite = require("./DomainRules.spec")
+local result = Suite.run(DomainRules, Catalog)
+print(string.format("PASS: %d assertions; %d parent/world cases", result.checks, result.worldCases))

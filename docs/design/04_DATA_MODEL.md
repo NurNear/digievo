@@ -1,6 +1,8 @@
 # Data Model — v1.0
 
-แบบข้อมูลสำหรับMVP ยังไม่มีschemaที่ใช้งานจริง. กฎและตัวเลขcatalogใช้ [Domain Rules](06_DOMAIN_RULES.md) ส่วนข้อเปิดใช้ [PRD](01_PRD_REVIEW.md)
+อัปเดต 2026-09-12: มี schema v1 และ repository ทดสอบด้วย backend จำลองแล้ว; ยังไม่เชื่อมข้อมูลออนไลน์. กฎและตัวเลขcatalogใช้ [Domain Rules](06_DOMAIN_RULES.md) ส่วนข้อเปิดใช้ [PRD](01_PRD_REVIEW.md)
+
+Implementation I-02 ใช้ `coinDelta`, `eggDelta`, `pendingEggDelta`, `removeIds`, `createCreatures`, `updateCreatures`, `nodeUpdates`, grant flags และ `result` เป็น resultPlan แบบ typed changes; ชื่อจริงและ validation อยู่ใน ProfileSchema. Plan builder เป็น server-only และไม่ใช่ payload ที่รับจาก client
 
 ## ประเภทและข้อจำกัดร่วม
 IDเป็นstring1–128ตัวอักษรและไม่ยอมรับช่องว่างล้วน; integerต้องfiniteไม่เกิน2^53-1. Timestampเป็นUnix secondsตามserver. Probabilityบนwireเป็นnumber0–1ไม่ใช่เปอร์เซ็นต์และไม่ปัดก่อนสุ่ม. Optional fieldที่ไม่มีค่าให้ละkeyในLuau table ไม่ใช้sentinelปลอม

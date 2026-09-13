@@ -1,9 +1,39 @@
 # Development Tasks — v1.0
 
-ลำดับนี้เป็นแผนงานหลังคำสั่งimplementationเท่านั้น ไม่มีงานโค้ดเริ่มแล้ว. Scope/ข้อเปิด [PRD](01_PRD_REVIEW.md), ตัวเลข [Domain](06_DOMAIN_RULES.md), contracts [API](05_API_SPEC.md)
+ผู้ใช้สั่งเริ่ม I-00 และให้เดินต่อวันที่ 2026-09-12 แล้ว ปัจจุบันมีโมดูลกฎ I-01 และระบบข้อมูล I-02 แบบทดสอบในเครื่อง ยังไม่มีเกมที่เล่นครบวงจรหรือการบันทึกออนไลน์. Scope/ข้อเปิด [PRD](01_PRD_REVIEW.md), ตัวเลข [Domain](06_DOMAIN_RULES.md), contracts [API](05_API_SPEC.md)
+
+## I-00: เริ่มแล้ว 2026-09-12
+- คำสั่งผู้ใช้เริ่ม I-00 ปิด O-05 และแทนสถานะ T-06 ที่ยังไม่อนุญาตในบันทึก Discovery เดิมด้านล่าง
+- ยึด MVP baseline v1.0: พื้นที่เล็ก, catalog 8 ตัว, ไข่/ฟัก/คอลเลกชัน, ผสมพร้อม preview/inheritance, Level/Growth, PvE manual 1 ต่อ 1, World Condition และ profile/recovery
+- คงงานนอก MVP และ O-01 ถึง O-04 ตาม PRD
+- เริ่มพัฒนาจาก place ใหม่ในเครื่อง ไม่บันทึกทับ place จริง; เปิด Studio อย่างเดียวไม่ถือว่าสร้างหรือเชื่อม place แล้ว
+- ก่อนทดสอบข้อมูลออนไลน์ ใช้ test experience แยกจาก production และบันทึก UniverseId/PlaceId ที่ตรวจสอบแล้ว ปัจจุบันยังไม่ได้สร้างหรือยืนยัน ID และยังไม่ publish
+- namespace ข้อมูลทดสอบกำหนดเป็น `RobloxMVP_Test_v1`; ก่อนยืนยัน test experience ใช้ข้อมูลจำลองในหน่วยความจำและคง Studio API access ปิดไว้ แผนนี้ยังไม่ได้ตั้งค่าหรือทดสอบจริง
+- I-02 ต้องตรวจ environment/UniverseId ก่อนเข้าถึงข้อมูลถาวร และปฏิเสธการเขียนเมื่อไม่รู้ environment; ห้ามใช้ข้อมูลจริงทดสอบ migration/reset
+- ยืนยัน scope และแผนแล้ว แต่การสร้าง test experience และตรวจการแยกข้อมูลจริงยังค้างก่อนทดสอบออนไลน์ จึงยังไม่ปิด I-00 ว่าเสร็จครบ
+- สร้าง `build/RobloxMVP_LocalTest.rbxlx` ผ่าน Rojo และเปิดใน Studio แล้ว; มีพื้น/จุดเกิดและชุดทดสอบ ไม่มีระบบบันทึกข้อมูล
+- Rojo จำกัด localhost และ `servePlaceIds: [0]` ตรวจจาก API ของ server แล้ว; ตัวเริ่มทดสอบปฏิเสธเมื่อไม่ใช่ Studio หรือ GameId/PlaceId ไม่ใช่ 0 ผู้ใช้กด Connect/Play และตรวจ log พบ I-01 PASS แล้ว
+- ไม่มีการสร้าง test experience บนคลาวด์หรือ publish; การแยก DataStore จริงยังต้องทำก่อน I-02 ทดสอบออนไลน์
+
+## I-01: โมดูลกฎและการตรวจแบบ offline
+- เพิ่ม `Catalog.luau`: definitions 8 ตัว, 6 สกิลและ BASIC, progression/economy/world config แบบ versioned และ immutable; epochUnix = 0 ตาม Data Model
+- เพิ่ม `DomainRules.luau`: stats/XP/Potential, Growth และ inherited compatibility, phase ID รวม cycle, preview และการสุ่ม rarity ก่อน candidate, ไข่ 50/50, สูตร damage/shield/cooldown
+- ตรวจด้วย Luau 0.738: 144 คู่ผสม/world cases, rarity marginal, สลับต้นทาง, skill/star independence จาก world, ขอบเขตสุ่ม/เวลา/XP, stats ทุก level/star, ตัวอย่าง damage และ config ผิด
+- ชุดทดสอบอยู่ `tests/DomainRules.spec.luau`; รัน CLI ผ่าน `tests/run.luau` และบรรจุชุดเดียวกันใน ServerStorage สำหรับกด Play ใน Studio
+- แก้การปัด stats ที่คลาดจาก floating point โดยใช้ percentage factors ก่อน floor ครั้งสุดท้าย; ตรวจเทียบ integer reference ครบทุก definition/level/star
+- Luau analyzer และ Rojo build ผ่าน; รายละเอียดผลและข้อจำกัดดู [บันทึกทดสอบ](../testing/I-01_RESULTS.md)
+- I-01 ส่วน pure rules เสร็จ: CLI และ Studio ผ่าน 14,322 assertions รวม 144 world cases; ผู้ใช้ยืนยัน live sync/Play และตรวจ log จริงแล้ว ไม่ใช่ผล playtest, persistence/fault, network/load หรือ FPS
+
+## I-02: ระบบข้อมูลและ recovery (local implementation)
+- เพิ่ม ProfileSchema/ProfileRepository/ProfileSession, MemoryStore สำหรับทดสอบ และ RobloxStore adapter ที่ตรวจ environment ก่อนเข้าถึง DataStore
+- มี lease 120 วินาที ต่ออายุ 30 วินาที, fencing generation, intent 60 วินาที, prepare/commit, receipt 100 รายการ และ sequence ถาวร
+- คำตอบบันทึกหายให้ pending และพักรายการใหม่จนตรวจ backend; schema ผิดไม่สร้าง default ทับ; ตรวจขนาดทั้ง prepare และผล commit ก่อนเขียน
+- CLI ผ่าน 5,534 checks รวม fault จำลอง 400 รอบ; I-01 regression ยังผ่านทั้งหมด; Rojo 7.7.0 build ผ่าน
+- LocalTest เปิดโปรไฟล์และแจกเงิน/ไข่เริ่มต้นแบบจำลองในหน่วยความจำเท่านั้น ปิด Play แล้วข้อมูลไม่คงอยู่
+- I-02 ยังไม่ปิดครบด้าน online persistence: ต้องมี test experience/IDs และตรวจ DataStore จริงก่อน งานที่ทำและข้อจำกัดดู [รายงาน I-02](../testing/I-02_RESULTS.md)
 
 ## Discovery status
-T-00สำรวจเสร็จ; T-01ผู้ใช้/journeyเสร็จ; T-02scopeทดลองยืนยันโดยมีO-01; T-03มีcatalog/economy/worldbaselineครบแต่ยังไม่playtest; T-04มีarchitecture/schema/contractsฉบับรวมและNFRร่าง; T-05แตกงานด้านล่างเสร็จ. T-06 implementationยังไม่อนุญาต
+T-00สำรวจเสร็จ; T-01ผู้ใช้/journeyเสร็จ; T-02scopeทดลองยืนยันโดยมีO-01; T-03มีcatalog/economy/worldbaselineครบแต่ยังไม่playtest; T-04มีarchitecture/schema/contractsฉบับรวมและNFRร่าง; T-05แตกงานเสร็จ. T-06 เริ่ม implementation ตามคำสั่งผู้ใช้แล้ว
 
 ## ลำดับพัฒนาและเกณฑ์จบ
 | งาน | Dependency | ผลงานและเกณฑ์จบ | AC/NFR |

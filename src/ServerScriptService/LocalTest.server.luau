@@ -33,6 +33,19 @@ workspace:SetAttribute("PersistenceTestsReady", true)
 workspace:SetAttribute("PersistenceTestChecks", persistenceResult.checks)
 print(string.format("I-02 PASS: %d checks, %d fault runs. Memory backend only; no cloud writes.", persistenceResult.checks, persistenceResult.faultRuns))
 
+local rpcModules = {
+    Schema = modules.Schema,
+    Repository = modules.Repository,
+    MemoryStore = modules.MemoryStore,
+    Session = modules.Session,
+    Dispatcher = require(script.Parent.RPC.Dispatcher),
+    Views = require(script.Parent.RPC.ViewModels),
+}
+local rpcResult = require(game:GetService("ServerStorage").RpcTests).run(rpcModules, rules, Catalog)
+workspace:SetAttribute("RpcTestsReady", true)
+workspace:SetAttribute("RpcTestChecks", rpcResult.checks)
+print(string.format("I-03 PASS: %d RPC checks. Memory backend only; no client UI yet.", rpcResult.checks))
+
 local schema = modules.Schema.new(rules, measure)
 local repository = modules.Repository.new({
     schema = schema,

@@ -32,6 +32,9 @@
       },
       "PersistenceTests": {
         "$path": "tests/Persistence.spec.luau"
+      },
+      "RpcTests": {
+        "$path": "tests/Rpc.spec.luau"
       }
     },
     "ReplicatedStorage": {

@@ -32,6 +32,14 @@
 - LocalTest เปิดโปรไฟล์และแจกเงิน/ไข่เริ่มต้นแบบจำลองในหน่วยความจำเท่านั้น ปิด Play แล้วข้อมูลไม่คงอยู่
 - I-02 ยังไม่ปิดครบด้าน online persistence: ต้องมี test experience/IDs และตรวจ DataStore จริงก่อน งานที่ทำและข้อจำกัดดู [รายงาน I-02](../testing/I-02_RESULTS.md)
 
+## I-03: RPC boundary (local implementation)
+- เพิ่ม server-side `RPC/Dispatcher.luau` และ `RPC/ViewModels.luau` สำหรับ envelope validation, response mapping, profile/world/receipt views, request replay และ rate limit เบื้องต้น
+- `Operation.Create` รับเฉพาะ kind ที่ server register builder ไว้ และ `Operation.Execute` ใช้ fingerprint ที่ผูกไว้ฝั่ง server จาก create เดิม ไม่รับ params ใหม่จาก client
+- เพิ่ม `tests/Rpc.spec.luau` และ map `RpcTests` เข้า ServerStorage; LocalTest จะรัน suite นี้ร่วมกับ I-01/I-02
+- CLI ผ่าน I-03 จำนวน 44 checks; I-01 regression 14,322 assertions และ I-02 regression 5,534 checks/400 fault runs ยังผ่าน; luau-analyze และ Rojo build ผ่าน
+- ยังไม่ปิดครบแบบ Studio Play/RemoteEvent UI: ยังไม่มีหน้าจอ client, ยังไม่ผูก GameRequest/GameResponse/GamePush จริง และยังไม่ใช่ action rules เต็มของ I-04-I-06
+- รายละเอียดผลและข้อจำกัดดู [รายงาน I-03](../testing/I-03_RESULTS.md)
+
 ## Discovery status
 T-00สำรวจเสร็จ; T-01ผู้ใช้/journeyเสร็จ; T-02scopeทดลองยืนยันโดยมีO-01; T-03มีcatalog/economy/worldbaselineครบแต่ยังไม่playtest; T-04มีarchitecture/schema/contractsฉบับรวมและNFRร่าง; T-05แตกงานเสร็จ. T-06 เริ่ม implementation ตามคำสั่งผู้ใช้แล้ว
 

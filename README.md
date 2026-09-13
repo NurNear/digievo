@@ -1,8 +1,8 @@
-# Roblox
+# Digievo
 
 Roblox project scaffold connected to:
 
-https://github.com/NurNear/Roblox
+https://github.com/NurNear/digievo
 
 ## Structure
 
@@ -56,7 +56,7 @@ that memory store. No client action routes or online storage are enabled.
 This local project has the Git remote set to:
 
 ```text
-origin https://github.com/NurNear/Roblox.git
+origin https://github.com/NurNear/digievo.git
 ```
 
 If the repository is private, GitHub credentials or a personal access token are required before pushing.

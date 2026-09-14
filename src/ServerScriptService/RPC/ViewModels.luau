@@ -77,7 +77,7 @@ function ViewModels.mixPreview(rules, previewId, expiresAt, profileVersion, pare
         profileVersion = profileVersion,
         world = preview.world,
         cost = preview.cost,
-        parentIds = cloneArray(parentIds),
+        parentIds = table.clone(parentIds),
         baseRarity = preview.baseRarity,
         rarityProbabilities = cloneArray(preview.rarityProbabilities),
         candidates = cloneArray(preview.candidates),

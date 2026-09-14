@@ -48,6 +48,15 @@
 - ผล CLI/build และข้อจำกัดดู [รายงาน I-04](../testing/I-04_RESULTS.md); Studio log ยืนยัน I-01–I-04 PASS แล้ว และผู้ใช้ยืนยันทดสอบฟัก/เดินเก็บไข่/ล็อก–ปลดล็อกครบโดยไม่ได้รายงานปัญหา; ยังไม่ทดสอบเครือข่ายหลาย client
 - ใช้ memory backend เท่านั้น; ระบบผสมและต่อสู้ยังเป็น I-05/I-06 ที่ต้องทำต่อ
 
+## I-05: Mix/preview (local implementation, 2026-09-14)
+- เพิ่ม MixService และ route Mix.Preview พร้อม token ฝั่ง server อายุ 60 วินาที ผูกผู้เล่น/ต้นทาง/profileVersion/world phase
+- แสดงโอกาส rarity, ตัวละคร, ดาว/การรีเซ็ตดาว และสกิลสืบทอด ก่อนยืนยันใช้ต้นทาง 2 ตัวและ 20 เหรียญ
+- Create ไม่สุ่ม; Execute สุ่มครั้งเดียวและใช้ prepare/commit เดิม ตรวจ freshness ซ้ำใน callback ก่อน PREPARE; prepared/receipt มีสิทธิ์เหนือ expiry/phase ใหม่
+- ตรวจ ownership/lock/เงิน/in-battle และยอมผสมเมื่อช่องตัวละครเต็ม เพราะจำนวนสุทธิลด 1
+- เพิ่ม UI เลือกต้นทาง ปุ่มล็อกแยก ดูโอกาส ยืนยัน และยกเลิก; preview ถูกล้างเมื่อข้อมูลเปลี่ยน/โลกเปลี่ยน/หมดเวลา
+- CLI และข้อจำกัดดู [รายงาน I-05](../testing/I-05_RESULTS.md); Studio log ยืนยัน I-01–I-05 PASS แล้ว (2026-09-14); ผู้ใช้ยืนยันทดลองผสมผ่าน UI แล้วโดยไม่ได้รายงานปัญหา; ยังไม่ยืนยัน manual expiry และ multi-client
+- ระบบต่อสู้ I-06 และ online DataStore ยังไม่เปิด
+
 ## Discovery status
 T-00สำรวจเสร็จ; T-01ผู้ใช้/journeyเสร็จ; T-02scopeทดลองยืนยันโดยมีO-01; T-03มีcatalog/economy/worldbaselineครบแต่ยังไม่playtest; T-04มีarchitecture/schema/contractsฉบับรวมและNFRร่าง; T-05แตกงานเสร็จ. T-06 เริ่ม implementation ตามคำสั่งผู้ใช้แล้ว
 

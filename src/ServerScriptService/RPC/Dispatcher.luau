@@ -58,6 +58,8 @@ local ERROR_POLICY = {
     PROFILE_NOT_READY = { "later", 1000 },
     STORAGE_UNAVAILABLE = { "same_operation", 1000 },
     OPERATION_PENDING = { "same_operation", 1000 },
+    EXPIRED_INTENT = { "refresh" },
+    STALE_PREVIEW = { "refresh" },
     STALE_PROFILE = { "refresh" },
     STALE_OPERATION = { "refresh" },
     IDEMPOTENCY_CONFLICT = { "refresh" },
@@ -139,6 +141,13 @@ function Dispatcher.new(options)
         return { status = "ok", data = views.world(rules, now()) }
     end
 
+    function handlers.Mix_Preview(userId, args)
+        if not options.mix then fail("INVALID_INPUT") end
+        local snapshot = sessions.snapshot(userId)
+        if snapshot.status ~= "ok" then return snapshot end
+        return {status = "ok", data = options.mix.preview(userId, snapshot.profile, args, now()), profile = snapshot.profile}
+    end
+
     function handlers.Operation_Create(userId, args)
         exactFields(args, { kind = true, params = true })
         assertId(args.kind)
@@ -147,10 +156,16 @@ function Dispatcher.new(options)
         if not builder then fail("INVALID_INPUT") end
         local snapshot = sessions.snapshot(userId)
         if snapshot.status ~= "ok" then return snapshot end
+        local worldPhaseId
+        if args.kind == "Mix.Commit" and options.mix then
+            worldPhaseId = options.mix.validate(userId, snapshot.profile, args.params, now()).phaseId
+        end
         local fingerprint = "op:" .. args.kind .. ":" .. stable(args.params)
         local issued = repository.issue(userId, args.kind, fingerprint, snapshot.profile.profileVersion, function(operationId, profile, dryRun)
             return builder(operationId, profile, args.params, now(), userId, dryRun)
-        end, now() + 60, nil, true)
+        end, now() + 60, worldPhaseId, true, if args.kind == "Mix.Commit" and options.mix then function(profile, timestamp)
+            options.mix.validate(userId, profile, args.params, timestamp)
+        end else nil)
         if issued.status ~= "ok" then return issued end
         operationFingerprints[issued.operationId] = fingerprint
         operationParams[issued.operationId] = { userId = userId, kind = args.kind, params = args.params }
@@ -200,6 +215,7 @@ function Dispatcher.new(options)
     local actionMap = {
         ["Profile.Get"] = handlers.Profile_Get,
         ["World.Get"] = handlers.World_Get,
+        ["Mix.Preview"] = handlers.Mix_Preview,
         ["Operation.Create"] = handlers.Operation_Create,
         ["Operation.Execute"] = handlers.Operation_Execute,
         ["Operation.Get"] = handlers.Operation_Get,
@@ -237,6 +253,7 @@ function Dispatcher.new(options)
 
     function service.forget(userId)
         replay[userId] = nil
+        if options.mix then options.mix.forget(userId) end
         for id, meta in pairs(operationParams) do
             if meta.userId == userId then operationParams[id] = nil; operationFingerprints[id] = nil end
         end

@@ -124,6 +124,7 @@ function ProfileRepository.new(options)
             check(intent.inputFingerprint == fingerprint, "IDEMPOTENCY_CONFLICT")
             check(now() < intent.expiresAt, "EXPIRED_INTENT")
             check(current.profileVersion == intent.expectedProfileVersion, "STALE_PROFILE")
+            if intent.validatePlan then intent.validatePlan(copy(current), now()) end
             current.preparedOperation = {
                 operationId=operationId, seq=current.lastAppliedSeq + 1, kind=intent.kind,
                 inputFingerprint=fingerprint, expectedProfileVersion=intent.expectedProfileVersion,
@@ -168,7 +169,7 @@ function ProfileRepository.new(options)
     end
 
     -- Only a server domain service may supply a plan builder. This is not a client API.
-    function repository.issue(userId, kind, fingerprint, expectedVersion, buildPlan, expiry, worldPhaseId, deferred)
+    function repository.issue(userId, kind, fingerprint, expectedVersion, buildPlan, expiry, worldPhaseId, deferred, validatePlan)
         return locked(userId, function(state)
             ready(state); schema.id(fingerprint)
             check(expectedVersion == state.profile.profileVersion, "STALE_PROFILE")
@@ -184,7 +185,7 @@ function ProfileRepository.new(options)
             if worldPhaseId then schema.id(worldPhaseId) end
             local plan = copy(buildPlan(operationId, copy(state.profile), deferred == true))
             schema.apply(state.profile, plan, operationId, kind)
-            state.intent = { operationId=operationId, kind=kind, inputFingerprint=fingerprint, expectedProfileVersion=expectedVersion, expiresAt=expiresAt, resultPlan=plan, worldPhaseId=worldPhaseId, buildPlan=if deferred then buildPlan else nil }
+            state.intent = { operationId=operationId, kind=kind, inputFingerprint=fingerprint, expectedProfileVersion=expectedVersion, expiresAt=expiresAt, resultPlan=plan, worldPhaseId=worldPhaseId, buildPlan=if deferred then buildPlan else nil, validatePlan=validatePlan }
             return { status="ok", operationId=operationId }
         end)
     end

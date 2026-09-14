@@ -51,6 +51,11 @@ local eggResult = require(game:GetService("ServerStorage").EggActionsTests).run(
 workspace:SetAttribute("EggTestChecks", eggResult.checks)
 print(string.format("I-04 PASS: %d checks. Memory backend only.", eggResult.checks))
 
+rpcModules.Mix = require(script.Parent.Gameplay.MixService)
+local mixResult = require(game:GetService("ServerStorage").MixTests).run(rpcModules, rules, Catalog)
+workspace:SetAttribute("MixTestChecks", mixResult.checks)
+print(string.format("I-05 PASS: %d checks. Memory backend only.", mixResult.checks))
+
 local schema = modules.Schema.new(rules, measure)
 local repository = modules.Repository.new({
     schema = schema,
@@ -100,14 +105,17 @@ local function validateExecute(userId, kind, params)
     if kind == "Egg.Collect" and not nearNode(userId, params.nodeId) then error({code = "OUT_OF_RANGE"}, 0) end
 end
 local random = Random.new()
+local gameplayOptions = {rules = rules, catalog = Catalog, views = rpcModules.Views,
+    nearNode = nearNode, inBattle = function() return false end,
+    nextNumber = function() return random:NextNumber() end,
+    newId = function() return HttpService:GenerateGUID(false) end,
+}
+local mix = require(script.Parent.Gameplay.MixService).new(gameplayOptions)
+local builders = rpcModules.Actions.new(gameplayOptions)
+builders["Mix.Commit"] = mix.build
 local dispatcher = rpcModules.Dispatcher.new({repository = repository, sessions = sessions,
     rules = rules, catalog = Catalog, views = rpcModules.Views, clock = os.time,
-    validateExecute = validateExecute,
-    operationBuilders = require(script.Parent.Gameplay.EggActions).new({
-        rules = rules, catalog = Catalog, views = rpcModules.Views, nearNode = nearNode,
-        inBattle = function() return false end, -- Battle service is introduced in I-06.
-        nextNumber = function() return random:NextNumber() end,
-    }),
+    validateExecute = validateExecute, operationBuilders = builders, mix = mix,
 })
 local remotes = Instance.new("Folder")
 remotes.Name = "GameRemotes"

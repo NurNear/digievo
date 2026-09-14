@@ -14,11 +14,13 @@ https://github.com/NurNear/digievo
 ## Local Test Place
 
 Current scope includes I-01 domain rules, I-02 profile/recovery, I-03 RPC and
-I-04 egg/collection gameplay using an in-memory backend. The local UI supports
+I-04 egg/collection and I-05 mixing gameplay using an in-memory backend. The local UI supports
 collecting at three nodes, buying/hatching eggs, locking creatures and claiming
-pending egg rewards. Mixing and battle gameplay are not implemented yet.
+pending egg rewards. Select two unlocked creatures to preview rarity, stars and
+inherited skills, then explicitly confirm the 20-coin mix. Both parents are consumed
+and replaced by one level-one child. Battle gameplay is not implemented yet.
 Stopping Play discards the test profile; cloud persistence remains disabled.
-See [I-04 verification](docs/testing/I-04_RESULTS.md).
+See [I-05 verification](docs/testing/I-05_RESULTS.md).
 
 On this Intel Mac:
 
@@ -26,6 +28,7 @@ On this Intel Mac:
 .tools/luau-0.738/luau tests/run.luau
 .tools/luau-0.738/luau tests/persistence-run.luau
 .tools/luau-0.738/luau tests/eggs-run.luau
+.tools/luau-0.738/luau tests/mix-run.luau
 .tools/rojo-7.7.0/rojo build default.project.json -o build/RobloxMVP_LocalTest.rbxlx
 open -a RobloxStudio build/RobloxMVP_LocalTest.rbxlx
 ```

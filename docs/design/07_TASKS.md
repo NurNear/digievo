@@ -40,6 +40,14 @@
 - ยังไม่ปิดครบแบบ Studio Play/RemoteEvent UI: ยังไม่มีหน้าจอ client, ยังไม่ผูก GameRequest/GameResponse/GamePush จริง และยังไม่ใช่ action rules เต็มของ I-04-I-06
 - รายละเอียดผลและข้อจำกัดดู [รายงาน I-03](../testing/I-03_RESULTS.md)
 
+## I-04: ไข่และคอลเลกชัน (local implementation, 2026-09-14)
+- เพิ่ม EggActions สำหรับ Collect/Buy/Hatch/SetLocked/ClaimPendingEggs พร้อมตรวจ params, ราคา, ช่องเต็ม, cooldown และระยะฝั่ง server
+- เชื่อม GameRequest/GameResponse/GamePush กับ Player identity และเพิ่ม UI ภาษาไทย จุดสำรวจ 3 จุด ตัวนับ cooldown และคอลเลกชัน
+- Create ตรวจแผนโดยไม่สุ่ม; Execute สุ่มครั้งเดียวก่อน prepare นอก callback และ recovery ใช้ผลเดิม
+- ฟักแสดงผลหลัง committed และ presentation 3 วินาที; client ใช้ requestId เดิมเมื่อคำตอบหายและไม่ลด profileVersion ย้อนหลัง
+- ผล CLI/build และข้อจำกัดดู [รายงาน I-04](../testing/I-04_RESULTS.md); Studio log ยืนยัน I-01–I-04 PASS แล้ว และผู้ใช้ยืนยันทดสอบฟัก/เดินเก็บไข่/ล็อก–ปลดล็อกครบโดยไม่ได้รายงานปัญหา; ยังไม่ทดสอบเครือข่ายหลาย client
+- ใช้ memory backend เท่านั้น; ระบบผสมและต่อสู้ยังเป็น I-05/I-06 ที่ต้องทำต่อ
+
 ## Discovery status
 T-00สำรวจเสร็จ; T-01ผู้ใช้/journeyเสร็จ; T-02scopeทดลองยืนยันโดยมีO-01; T-03มีcatalog/economy/worldbaselineครบแต่ยังไม่playtest; T-04มีarchitecture/schema/contractsฉบับรวมและNFRร่าง; T-05แตกงานเสร็จ. T-06 เริ่ม implementation ตามคำสั่งผู้ใช้แล้ว
 

@@ -13,10 +13,26 @@ https://github.com/NurNear/digievo
 
 ## Local Test Place
 
-Current scope includes I-01 domain rules and I-02 profile/recovery tested with
-an in-memory backend. There is no playable game loop or cloud persistence yet.
-See [I-01 verification](docs/testing/I-01_RESULTS.md) and
-[I-02 verification](docs/testing/I-02_RESULTS.md).
+Current scope includes I-01 domain rules, I-02 profile/recovery, I-03 RPC and
+I-04 egg/collection gameplay using an in-memory backend. The local UI supports
+collecting at three nodes, buying/hatching eggs, locking creatures and claiming
+pending egg rewards. Mixing and battle gameplay are not implemented yet.
+Stopping Play discards the test profile; cloud persistence remains disabled.
+See [I-04 verification](docs/testing/I-04_RESULTS.md).
+
+On this Intel Mac:
+
+```sh
+.tools/luau-0.738/luau tests/run.luau
+.tools/luau-0.738/luau tests/persistence-run.luau
+.tools/luau-0.738/luau tests/eggs-run.luau
+.tools/rojo-7.7.0/rojo build default.project.json -o build/RobloxMVP_LocalTest.rbxlx
+open -a RobloxStudio build/RobloxMVP_LocalTest.rbxlx
+```
+
+Press Play, hatch the starter egg, walk near a gold node and collect another.
+The panel shows node cooldowns, inventory and lock buttons. Local tool binaries
+are ignored by Git; Luau 0.738 was built from source for Intel macOS.
 
 Rojo is pinned in `aftman.toml` to the stable 7.7.0 version.
 
@@ -49,7 +65,7 @@ once and provide server-owned creature snapshots and an injected RNG to its
 pure functions. Server-only persistence modules live under
 `src/ServerScriptService/Persistence`. The local harness initializes a test
 profile with starter resources and renews its lease; stopping Play discards
-that memory store. No client action routes or online storage are enabled.
+that memory store. Client action routes are connected in the local test place; online storage is disabled.
 
 ## GitHub
 

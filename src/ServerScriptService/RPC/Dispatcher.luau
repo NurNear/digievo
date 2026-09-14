@@ -21,12 +21,20 @@ local function assertId(value)
     end
 end
 
-local function stable(value)
+local function stable(value: any, depth, seen, budget)
+    depth, seen, budget = depth or 0, seen or {}, budget or {size = 0}
+    if depth > 12 then fail("INVALID_INPUT") end
+    budget.size += 8
+    if type(value) == "string" then budget.size += #value end
+    if budget.size > 8192 then fail("INVALID_INPUT") end
     local kind = type(value)
     if kind == "nil" or kind == "boolean" or kind == "number" or kind == "string" then
+        if kind == "number" and (value ~= value or math.abs(value) == math.huge) then fail("INVALID_INPUT") end
         return kind .. ":" .. tostring(value)
     end
     if kind ~= "table" then fail("INVALID_INPUT") end
+    if seen[value] then fail("INVALID_INPUT") end
+    seen[value] = true
     local keys = {}
     for key in pairs(value) do
         local keyType = type(key)
@@ -36,9 +44,10 @@ local function stable(value)
     table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
     local parts = { "table{" }
     for _, key in ipairs(keys) do
-        table.insert(parts, stable(key) .. "=" .. stable(value[key]) .. ";")
+        table.insert(parts, stable(key, depth + 1, seen, budget) .. "=" .. stable(value[key], depth + 1, seen, budget) .. ";")
     end
     table.insert(parts, "}")
+    seen[value] = nil
     return table.concat(parts)
 end
 
@@ -65,6 +74,7 @@ function Dispatcher.new(options)
     local rules, catalog, views = options.rules, options.catalog, options.views
     local clock = options.clock
     local operationBuilders = options.operationBuilders or {}
+    local operationParams = {}
     local replay, buckets, operationFingerprints = {}, {}, {}
     local service = {}
 
@@ -117,13 +127,15 @@ function Dispatcher.new(options)
 
     local handlers = {}
 
-    function handlers.Profile_Get(userId)
+    function handlers.Profile_Get(userId, args)
+        exactFields(args, {})
         local snapshot = sessions.snapshot(userId)
         if snapshot.status ~= "ok" then return { status = "pending", code = "PROFILE_NOT_READY" } end
         return { status = "ok", data = views.profile(rules, catalog, snapshot.profile), profile = snapshot.profile }
     end
 
-    function handlers.World_Get()
+    function handlers.World_Get(_, args)
+        exactFields(args, {})
         return { status = "ok", data = views.world(rules, now()) }
     end
 
@@ -136,11 +148,12 @@ function Dispatcher.new(options)
         local snapshot = sessions.snapshot(userId)
         if snapshot.status ~= "ok" then return snapshot end
         local fingerprint = "op:" .. args.kind .. ":" .. stable(args.params)
-        local issued = repository.issue(userId, args.kind, fingerprint, snapshot.profile.profileVersion, function(operationId, profile)
-            return builder(operationId, profile, args.params, now())
-        end, now() + 60)
+        local issued = repository.issue(userId, args.kind, fingerprint, snapshot.profile.profileVersion, function(operationId, profile, dryRun)
+            return builder(operationId, profile, args.params, now(), userId, dryRun)
+        end, now() + 60, nil, true)
         if issued.status ~= "ok" then return issued end
         operationFingerprints[issued.operationId] = fingerprint
+        operationParams[issued.operationId] = { userId = userId, kind = args.kind, params = args.params }
         return { status = "ok", data = { operationId = issued.operationId, expiresAt = now() + 60 }, profile = snapshot.profile }
     end
 
@@ -149,6 +162,18 @@ function Dispatcher.new(options)
         assertId(args.operationId)
         local fingerprint = operationFingerprints[args.operationId]
         if not fingerprint then return { status = "rejected", code = "STALE_OPERATION" } end
+        local meta = operationParams[args.operationId]
+        if not meta or meta.userId ~= userId then fail("STALE_OPERATION") end
+        local snapshot = sessions.snapshot(userId)
+        if snapshot.status == "ok" then
+            local accepted = snapshot.profile.preparedOperation ~= nil
+            for _, receipt in ipairs(snapshot.profile.receipts) do
+                if receipt.operationId == args.operationId then accepted = true end
+            end
+            if not accepted and options.validateExecute then
+                options.validateExecute(userId, meta.kind, meta.params)
+            end
+        end
         local executed = repository.execute(userId, args.operationId, fingerprint)
         return executed
     end
@@ -166,7 +191,7 @@ function Dispatcher.new(options)
         if snapshot.profile.preparedOperation and snapshot.profile.preparedOperation.operationId == args.operationId then
             return { status = "prepared", operationId = args.operationId }
         end
-        if operationFingerprints[args.operationId] then
+        if operationParams[args.operationId] and operationParams[args.operationId].userId == userId then
             return { status = "pending", code = "OPERATION_PENDING" }
         end
         return { status = "rejected", code = "STALE_OPERATION" }
@@ -210,6 +235,15 @@ function Dispatcher.new(options)
         return errorResponse(requestId, failure.code or "INVALID_INPUT", failure.retry, failure.retryAfterMs)
     end
 
+    function service.forget(userId)
+        replay[userId] = nil
+        for id, meta in pairs(operationParams) do
+            if meta.userId == userId then operationParams[id] = nil; operationFingerprints[id] = nil end
+        end
+        for key in pairs(buckets) do
+            if string.sub(tostring(key), 1, #tostring(userId) + 1) == tostring(userId) .. ":" then buckets[key] = nil end
+        end
+    end
     return service
 end
 

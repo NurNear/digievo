@@ -102,6 +102,15 @@ function ProfileRepository.new(options)
         end
         local intent, existing = state.intent, state.profile.preparedOperation
         check((intent and intent.operationId == operationId) or (existing and existing.operationId == operationId), "STALE_OPERATION")
+        if intent and intent.buildPlan and not existing then
+            check(now() < intent.expiresAt, "EXPIRED_INTENT")
+            check(state.profile.profileVersion == intent.expectedProfileVersion, "STALE_PROFILE")
+            -- Materialize randomness once outside UpdateAsync; retain this plan on retry.
+            local plan = copy(intent.buildPlan(operationId, copy(state.profile), false))
+            schema.apply(state.profile, plan, operationId, intent.kind)
+            intent.resultPlan = plan
+            intent.buildPlan = nil
+        end
         state.pendingId = operationId
         local profile = update(userId, state, function(current)
             fence(current, state)
@@ -159,7 +168,7 @@ function ProfileRepository.new(options)
     end
 
     -- Only a server domain service may supply a plan builder. This is not a client API.
-    function repository.issue(userId, kind, fingerprint, expectedVersion, buildPlan, expiry, worldPhaseId)
+    function repository.issue(userId, kind, fingerprint, expectedVersion, buildPlan, expiry, worldPhaseId, deferred)
         return locked(userId, function(state)
             ready(state); schema.id(fingerprint)
             check(expectedVersion == state.profile.profileVersion, "STALE_PROFILE")
@@ -173,9 +182,9 @@ function ProfileRepository.new(options)
             local expiresAt = math.min(now() + 60, expiry or now() + 60)
             schema.integer(expiresAt, now() + 1, now() + 60)
             if worldPhaseId then schema.id(worldPhaseId) end
-            local plan = copy(buildPlan(operationId, copy(state.profile)))
+            local plan = copy(buildPlan(operationId, copy(state.profile), deferred == true))
             schema.apply(state.profile, plan, operationId, kind)
-            state.intent = { operationId=operationId, kind=kind, inputFingerprint=fingerprint, expectedProfileVersion=expectedVersion, expiresAt=expiresAt, resultPlan=plan, worldPhaseId=worldPhaseId }
+            state.intent = { operationId=operationId, kind=kind, inputFingerprint=fingerprint, expectedProfileVersion=expectedVersion, expiresAt=expiresAt, resultPlan=plan, worldPhaseId=worldPhaseId, buildPlan=if deferred then buildPlan else nil }
             return { status="ok", operationId=operationId }
         end)
     end

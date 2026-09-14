@@ -33,6 +33,9 @@
       "PersistenceTests": {
         "$path": "tests/Persistence.spec.luau"
       },
+      "EggActionsTests": {
+        "$path": "tests/EggActions.spec.luau"
+      },
       "RpcTests": {
         "$path": "tests/Rpc.spec.luau"
       }

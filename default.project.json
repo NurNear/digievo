@@ -41,6 +41,9 @@
       },
       "RpcTests": {
         "$path": "tests/Rpc.spec.luau"
+      },
+      "BattleTests": {
+        "$path": "tests/Battle.spec.luau"
       }
     },
     "ReplicatedStorage": {

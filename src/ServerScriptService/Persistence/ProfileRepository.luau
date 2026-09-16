@@ -172,12 +172,13 @@ function ProfileRepository.new(options)
     function repository.issue(userId, kind, fingerprint, expectedVersion, buildPlan, expiry, worldPhaseId, deferred, validatePlan)
         return locked(userId, function(state)
             ready(state); schema.id(fingerprint)
+            check(not state.battleId or (kind == "BattleReward" and fingerprint == "battle:" .. state.battleId), "IN_BATTLE")
             check(expectedVersion == state.profile.profileVersion, "STALE_PROFILE")
             if state.intent and state.intent.expiresAt > now() then
                 check(state.intent.kind == kind and state.intent.inputFingerprint == fingerprint and state.intent.expectedProfileVersion == expectedVersion, "INTENT_BUSY")
                 return { status="ok", operationId=state.intent.operationId }
             end
-            local operationId = options.newId()
+            local operationId = if kind == "BattleReward" and state.battleId then "reward:" .. state.battleId else options.newId()
             schema.id(operationId)
             check(not receipt(state.profile, operationId, fingerprint), "REUSED_OPERATION_ID")
             local expiresAt = math.min(now() + 60, expiry or now() + 60)
@@ -212,6 +213,25 @@ function ProfileRepository.new(options)
             state.uncertain, state.pendingId = false, nil
             if state.intent and receipt(state.profile, state.intent.operationId, state.intent.inputFingerprint) then state.intent = nil end
             return { status="ok", profile=copy(state.profile) }
+        end)
+    end
+
+    -- Reserve synchronously before combat starts; outstanding intents must finish or expire.
+    function repository.reserveBattle(userId, battleId)
+        return locked(userId, function(state)
+            ready(state); schema.id(battleId)
+            check(not state.battleId, "IN_BATTLE")
+            check(not state.intent or state.intent.expiresAt <= now(), "OPERATION_BUSY")
+            state.intent = nil
+            state.battleId = battleId
+            return {status = "ok", profile = copy(state.profile)}
+        end)
+    end
+
+    function repository.endBattle(userId, battleId)
+        return locked(userId, function(state)
+            if state.battleId == battleId then state.battleId = nil end
+            return {status = "ok"}
         end)
     end
 

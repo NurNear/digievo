@@ -52,6 +52,13 @@ local function stable(value: any, depth, seen, budget)
 end
 
 local ERROR_POLICY = {
+    STALE_BATTLE = { "refresh" },
+    NOT_YOUR_TURN = { "refresh" },
+    SKILL_LOCKED = { "refresh" },
+    SKILL_COOLDOWN = { "refresh" },
+    BATTLE_ENDED = { "refresh" },
+    OPERATION_BUSY = { "later", 1000 },
+    IN_BATTLE = { "later", 1000 },
     BUSY = { "later", 250 },
     SESSION_BUSY = { "later", 250 },
     PROFILE_NOT_OPEN = { "later", 1000 },
@@ -106,6 +113,7 @@ function Dispatcher.new(options)
         elseif result.status == "prepared" then
             response.data = { operationId = result.operationId }
         elseif result.status == "pending" then
+            response.data = data or result.data
             response.error = { code = result.code or "OPERATION_PENDING", messageKey = "error.operation_pending", retry = "same_operation", retryAfterMs = 1000 }
         else
             local policy = ERROR_POLICY[result.code or "INVALID_INPUT"] or { "none" }
@@ -116,8 +124,9 @@ function Dispatcher.new(options)
     end
 
     local function throttle(userId, action)
-        local limits = if action == "Mix.Preview" then { rate = 2, burst = 4 } elseif action == "Profile.Get" or action == "World.Get" or action == "Operation.Get" then { rate = 1, burst = 2 } else { rate = 1, burst = 2 }
-        local key = tostring(userId) .. ":" .. action
+        local limits = if action == "Battle.Action" or action == "Battle.Forfeit" then {rate = 2, burst = 2} elseif action == "Mix.Preview" then { rate = 2, burst = 4 } else { rate = 1, burst = 2 }
+        local category = if action == "Battle.Action" or action == "Battle.Forfeit" then "battle" else action
+        local key = tostring(userId) .. ":" .. category
         local bucket = buckets[key] or { tokens = limits.burst, at = now() }
         local current = now()
         bucket.tokens = math.min(limits.burst, bucket.tokens + (current - bucket.at) * limits.rate)
@@ -152,6 +161,7 @@ function Dispatcher.new(options)
         exactFields(args, { kind = true, params = true })
         assertId(args.kind)
         if type(args.params) ~= "table" then fail("INVALID_INPUT") end
+        if options.battle and options.battle.inBattle(userId) then fail("IN_BATTLE") end
         local builder = operationBuilders[args.kind]
         if not builder then fail("INVALID_INPUT") end
         local snapshot = sessions.snapshot(userId)
@@ -185,6 +195,7 @@ function Dispatcher.new(options)
             for _, receipt in ipairs(snapshot.profile.receipts) do
                 if receipt.operationId == args.operationId then accepted = true end
             end
+            if not accepted and options.battle and options.battle.inBattle(userId) then fail("IN_BATTLE") end
             if not accepted and options.validateExecute then
                 options.validateExecute(userId, meta.kind, meta.params)
             end
@@ -221,6 +232,13 @@ function Dispatcher.new(options)
         ["Operation.Get"] = handlers.Operation_Get,
     }
 
+    if options.battle then
+        actionMap["Battle.Start"] = options.battle.start
+        actionMap["Battle.Get"] = options.battle.get
+        actionMap["Battle.Action"] = options.battle.action
+        actionMap["Battle.Forfeit"] = options.battle.forfeit
+    end
+
     function service.handle(userId, request)
         local requestId = "unknown"
         local ok, response = pcall(function()
@@ -248,12 +266,14 @@ function Dispatcher.new(options)
         end)
         if ok then return response end
         local failure = if type(response) == "table" then response else { code = "INVALID_INPUT" }
-        return errorResponse(requestId, failure.code or "INVALID_INPUT", failure.retry, failure.retryAfterMs)
+        local policy = ERROR_POLICY[failure.code] or {}
+        return errorResponse(requestId, failure.code or "INVALID_INPUT", failure.retry or policy[1], failure.retryAfterMs or policy[2])
     end
 
     function service.forget(userId)
         replay[userId] = nil
         if options.mix then options.mix.forget(userId) end
+        if options.battle then options.battle.forget(userId) end
         for id, meta in pairs(operationParams) do
             if meta.userId == userId then operationParams[id] = nil; operationFingerprints[id] = nil end
         end

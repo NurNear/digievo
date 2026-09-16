@@ -1,6 +1,6 @@
 # Development Tasks — v1.0
 
-ผู้ใช้สั่งเริ่ม I-00 และให้เดินต่อวันที่ 2026-09-12 แล้ว ปัจจุบันมีโมดูลกฎ I-01 และระบบข้อมูล I-02 แบบทดสอบในเครื่อง ยังไม่มีเกมที่เล่นครบวงจรหรือการบันทึกออนไลน์. Scope/ข้อเปิด [PRD](01_PRD_REVIEW.md), ตัวเลข [Domain](06_DOMAIN_RULES.md), contracts [API](05_API_SPEC.md)
+ผู้ใช้สั่งเริ่ม I-00 และให้เดินต่อวันที่ 2026-09-12 แล้ว ปัจจุบันพัฒนาถึง I-06 ต่อสู้และ progression แบบทดสอบในเครื่อง (2026-09-16); CLI ผ่านแล้ว แต่ I-06 ยังรอ Studio Play/manual walkthrough และยังไม่มีการบันทึกออนไลน์. Scope/ข้อเปิด [PRD](01_PRD_REVIEW.md), ตัวเลข [Domain](06_DOMAIN_RULES.md), contracts [API](05_API_SPEC.md)
 
 ## I-00: เริ่มแล้ว 2026-09-12
 - คำสั่งผู้ใช้เริ่ม I-00 ปิด O-05 และแทนสถานะ T-06 ที่ยังไม่อนุญาตในบันทึก Discovery เดิมด้านล่าง
@@ -37,7 +37,7 @@
 - `Operation.Create` รับเฉพาะ kind ที่ server register builder ไว้ และ `Operation.Execute` ใช้ fingerprint ที่ผูกไว้ฝั่ง server จาก create เดิม ไม่รับ params ใหม่จาก client
 - เพิ่ม `tests/Rpc.spec.luau` และ map `RpcTests` เข้า ServerStorage; LocalTest จะรัน suite นี้ร่วมกับ I-01/I-02
 - CLI ผ่าน I-03 จำนวน 44 checks; I-01 regression 14,322 assertions และ I-02 regression 5,534 checks/400 fault runs ยังผ่าน; luau-analyze และ Rojo build ผ่าน
-- ยังไม่ปิดครบแบบ Studio Play/RemoteEvent UI: ยังไม่มีหน้าจอ client, ยังไม่ผูก GameRequest/GameResponse/GamePush จริง และยังไม่ใช่ action rules เต็มของ I-04-I-06
+- RemoteEvent/UI เชื่อมแล้วใน I-04 และ Studio log ยืนยัน I-01–I-05 ผ่าน; เพิ่ม routes ต่อสู้ใน I-06 ซึ่งยังรอ Studio Play
 - รายละเอียดผลและข้อจำกัดดู [รายงาน I-03](../testing/I-03_RESULTS.md)
 
 ## I-04: ไข่และคอลเลกชัน (local implementation, 2026-09-14)
@@ -46,7 +46,7 @@
 - Create ตรวจแผนโดยไม่สุ่ม; Execute สุ่มครั้งเดียวก่อน prepare นอก callback และ recovery ใช้ผลเดิม
 - ฟักแสดงผลหลัง committed และ presentation 3 วินาที; client ใช้ requestId เดิมเมื่อคำตอบหายและไม่ลด profileVersion ย้อนหลัง
 - ผล CLI/build และข้อจำกัดดู [รายงาน I-04](../testing/I-04_RESULTS.md); Studio log ยืนยัน I-01–I-04 PASS แล้ว และผู้ใช้ยืนยันทดสอบฟัก/เดินเก็บไข่/ล็อก–ปลดล็อกครบโดยไม่ได้รายงานปัญหา; ยังไม่ทดสอบเครือข่ายหลาย client
-- ใช้ memory backend เท่านั้น; ระบบผสมและต่อสู้ยังเป็น I-05/I-06 ที่ต้องทำต่อ
+- ใช้ memory backend เท่านั้น; ระบบผสมต่อยอดใน I-05 และระบบต่อสู้ใน I-06 ด้านล่าง
 
 ## I-05: Mix/preview (local implementation, 2026-09-14)
 - เพิ่ม MixService และ route Mix.Preview พร้อม token ฝั่ง server อายุ 60 วินาที ผูกผู้เล่น/ต้นทาง/profileVersion/world phase
@@ -55,7 +55,18 @@
 - ตรวจ ownership/lock/เงิน/in-battle และยอมผสมเมื่อช่องตัวละครเต็ม เพราะจำนวนสุทธิลด 1
 - เพิ่ม UI เลือกต้นทาง ปุ่มล็อกแยก ดูโอกาส ยืนยัน และยกเลิก; preview ถูกล้างเมื่อข้อมูลเปลี่ยน/โลกเปลี่ยน/หมดเวลา
 - CLI และข้อจำกัดดู [รายงาน I-05](../testing/I-05_RESULTS.md); Studio log ยืนยัน I-01–I-05 PASS แล้ว (2026-09-14); ผู้ใช้ยืนยันทดลองผสมผ่าน UI แล้วโดยไม่ได้รายงานปัญหา; ยังไม่ยืนยัน manual expiry และ multi-client
-- ระบบต่อสู้ I-06 และ online DataStore ยังไม่เปิด
+- ระบบต่อสู้ต่อยอดใน I-06 ด้านล่าง; online DataStore ยังไม่เปิด
+
+## I-06: Battle/progression (local implementation, 2026-09-16)
+- เพิ่ม BattleService และ Battle.Start/Get/Action/Forfeit สำหรับ TRAINING 1 ต่อ 1; ศัตรู C01/C02 50/50, Level 1, 0 ดาว, HP เริ่ม 60% และใช้ BASIC
+- server จัดลำดับ Speed; เสมอสุ่มครั้งแรกแล้วสลับผู้เริ่มแต่ละรอบ; ตรวจ revision/ownership/สกิล/cooldown และจบเมื่อ HP 0 ทันที
+- Shield รับการโจมตีถัดไปหนึ่งครั้งหรือหมดเมื่อเริ่มเทิร์นเจ้าของ; Growth/Inherited ID ซ้ำแสดงเป็นท่าเดียว
+- ชนะให้ 20 Coin/20 XP/หนึ่งชัยชนะ Potential; Growth ปลดล็อก Level 5, XP cap 480/Level 10, ดาว cap 5; ไข่ชัยชนะแรกแน่นอนแล้ว 20%, เต็มให้ pending
+- reservation ฝั่ง repository กันรายการเศรษฐกิจระหว่างต่อสู้และระหว่างยืนยันรางวัล; reward operationId ผูก battleId และ PREPARE/COMMIT เก็บผลเดิมเมื่อ retry
+- เพิ่มแท่นสนามฝึกสีน้ำเงินและปุ่มฝึกต่อ creature รวมตัวที่ล็อก; UI แสดง HP/Shield/รอบ/สกิล/ผลโจมตี/ถอนตัว และ poll รางวัล pending
+- CLI ผ่าน 188 checks รวม flow ฟัก → สู้ → ปลดล็อก Growth → ผสม, callback ซ้ำ 100 ครั้ง, lost prepare/commit response, session takeover, outage เกิน intent expiry, overflow และกันรางวัลซ้ำ
+- Regression I-01–I-05 ผ่าน; analyzer/syntax/Rojo build ผ่าน ตาม [รายงาน I-06](../testing/I-06_RESULTS.md)
+- ยังไม่ยืนยัน Studio Play/UI/manual battle walkthrough, multi-client, DataStore จริงหรือ performance; I-06 ยังไม่ปิดครบด้านเล่นจริง งานถัดจากนั้นคือ I-07 รวม journey/งานภาพ
 
 ## Discovery status
 T-00สำรวจเสร็จ; T-01ผู้ใช้/journeyเสร็จ; T-02scopeทดลองยืนยันโดยมีO-01; T-03มีcatalog/economy/worldbaselineครบแต่ยังไม่playtest; T-04มีarchitecture/schema/contractsฉบับรวมและNFRร่าง; T-05แตกงานเสร็จ. T-06 เริ่ม implementation ตามคำสั่งผู้ใช้แล้ว
@@ -93,4 +104,4 @@ I-05/I-06ทำได้แยกหลังdependencyแต่ไม่มี�
 ## เกณฑ์จบและข้อจำกัด
 ก่อนให้ลูกเล่น: ไม่มีbugทำข้อมูลเสีย/ซ้ำ, corejourneyครบ, phase/cooldownตรง, เครื่องทดสอบบันทึก, ไม่มีงานpublishที่ทำโดยไม่มีคำสั่ง. หลังทดลองจึงเลือกปรับ/ทำต่อ/หยุด ไม่ขยายบอส/PvP/autoเอง
 
-สิ่งที่ทำแล้วตอนออกแบบ: คำนวณ144randomcases, สูตรdamage/XP, ตรวจเอกสารIDs/links/JSON. สิ่งที่ยังไม่ทำ: Robloxcode, durablefaulttest, network/load/FPS/playtest; ไม่รายงานว่าtestsเหล่านี้ผ่านจากการตรวจเอกสาร
+บันทึกออกแบบเดิมตรวจ 144 random cases, สูตร damage/XP และเอกสารเท่านั้น; สถานะ implementation/การทดสอบปัจจุบันให้ยึด I-01–I-06 และรายงานแต่ละขั้นด้านบน. Online durable fault, multi-client/load/FPS และ playtest เต็มวงจรยังค้าง

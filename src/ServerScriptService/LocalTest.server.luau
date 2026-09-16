@@ -56,6 +56,11 @@ local mixResult = require(game:GetService("ServerStorage").MixTests).run(rpcModu
 workspace:SetAttribute("MixTestChecks", mixResult.checks)
 print(string.format("I-05 PASS: %d checks. Memory backend only.", mixResult.checks))
 
+rpcModules.Battle = require(script.Parent.Gameplay.BattleService)
+local battleResult = require(game:GetService("ServerStorage").BattleTests).run(rpcModules, rules, Catalog)
+workspace:SetAttribute("BattleTestChecks", battleResult.checks)
+print(string.format("I-06 PASS: %d checks. Memory backend only.", battleResult.checks))
+
 local schema = modules.Schema.new(rules, measure)
 local repository = modules.Repository.new({
     schema = schema,
@@ -104,18 +109,44 @@ end
 local function validateExecute(userId, kind, params)
     if kind == "Egg.Collect" and not nearNode(userId, params.nodeId) then error({code = "OUT_OF_RANGE"}, 0) end
 end
+local training = Instance.new("Part")
+training.Name = "TrainingArena"
+training.Size = Vector3.new(12, 1, 12)
+training.Position = Vector3.new(24, 0.5, 12)
+training.Anchored = true
+training.Color = Color3.fromRGB(91, 153, 232)
+training.Parent = workspace
+nodes.TRAINING = training
+local sign = Instance.new("BillboardGui")
+sign.Size = UDim2.fromOffset(240, 60)
+sign.StudsOffset = Vector3.new(0, 4, 0)
+sign.AlwaysOnTop = true
+sign.Parent = training
+local trainingText = Instance.new("TextLabel")
+trainingText.Size = UDim2.fromScale(1, 1)
+trainingText.BackgroundTransparency = 1
+trainingText.TextColor3 = Color3.new(1, 1, 1)
+trainingText.TextSize = 18
+trainingText.TextWrapped = true
+trainingText.Text = "สนามฝึก • คู่ฝึก HP 60%\nเลือกตัวละครแล้วกดฝึก"
+trainingText.Parent = sign
 local random = Random.new()
+local battle
 local gameplayOptions = {rules = rules, catalog = Catalog, views = rpcModules.Views,
-    nearNode = nearNode, inBattle = function() return false end,
+    nearNode = nearNode, inBattle = function(userId) return battle and battle.inBattle(userId) or false end,
     nextNumber = function() return random:NextNumber() end,
     newId = function() return HttpService:GenerateGUID(false) end,
 }
+gameplayOptions.repository = repository
+gameplayOptions.copy = schema.copy
+gameplayOptions.nearTraining = function(userId) return nearNode(userId, "TRAINING") end
+battle = rpcModules.Battle.new(gameplayOptions)
 local mix = require(script.Parent.Gameplay.MixService).new(gameplayOptions)
 local builders = rpcModules.Actions.new(gameplayOptions)
 builders["Mix.Commit"] = mix.build
 local dispatcher = rpcModules.Dispatcher.new({repository = repository, sessions = sessions,
     rules = rules, catalog = Catalog, views = rpcModules.Views, clock = os.time,
-    validateExecute = validateExecute, operationBuilders = builders, mix = mix,
+    validateExecute = validateExecute, operationBuilders = builders, mix = mix, battle = battle,
 })
 local remotes = Instance.new("Folder")
 remotes.Name = "GameRemotes"
@@ -129,7 +160,10 @@ remotes.GameRequest.OnServerEvent:Connect(function(player, request)
     if not key then return end
     local response = dispatcher.handle(key, request)
     remotes.GameResponse:FireClient(player, response)
-    if response.status == "committed" then
+    if response.data and response.data.battle then
+        remotes.GamePush:FireClient(player, {apiVersion = 1, event = "BattleChanged", data = response.data.battle})
+    end
+    if response.status == "committed" or (response.data and response.data.battle and response.data.battle.status == "ended") then
         local snapshot = sessions.snapshot(key)
         if snapshot.status == "ok" then
             remotes.GamePush:FireClient(player, {apiVersion = 1, event = "ProfileChanged", data = rpcModules.Views.profile(rules, Catalog, snapshot.profile)})
@@ -154,7 +188,7 @@ Players.PlayerAdded:Connect(joined)
 Players.PlayerRemoving:Connect(function(player)
     local key = active[player]
     active[player] = nil
-    if key then sessions.leave(key); dispatcher.forget(key) end
+    if key then dispatcher.forget(key); sessions.leave(key) end
 end)
 for _, player in ipairs(Players:GetPlayers()) do joined(player) end
 task.spawn(function()

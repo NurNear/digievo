@@ -33,11 +33,20 @@ local worldLabel = label("กำลังอ่านสภาพโลก…", 
 local notice = label("เดินเข้าใกล้ลูกบอลสีทองเพื่อเก็บไข่", 44)
 local pending, profile, busy = {}, nil, false
 local presentingHatch, deferredView = false, nil
-local errors = {EXPIRED_INTENT = "รายการหมดอายุ กรุณาดูโอกาสและยืนยันใหม่", STALE_PREVIEW = "ตัวอย่างหมดอายุหรือข้อมูลเปลี่ยน กรุณาดูโอกาสใหม่", CREATURE_LOCKED = "ปลดล็อกตัวละครก่อนผสม", CREATURE_NOT_FOUND = "ไม่พบตัวละครต้นทาง กรุณาเลือกใหม่", IN_BATTLE = "รอให้การต่อสู้จบก่อน", OUT_OF_RANGE = "เดินเข้าใกล้จุดเก็บไข่ (ไม่เกิน 12 studs)", NODE_UNAVAILABLE = "จุดนี้ยังไม่พร้อม รอครบ 90 วินาที", INSUFFICIENT_FUNDS = "เหรียญไม่พอ", NO_EGG = "ยังไม่มีไข่", CAPACITY_FULL = "ช่องเก็บเต็ม", NOTHING_TO_CLAIM = "ไม่มีไข่รอรับ", RATE_LIMITED = "ทำรายการเร็วเกินไป กรุณารอสักครู่", STALE_PROFILE = "ข้อมูลเปลี่ยนแล้ว กรุณาลองใหม่", INTENT_BUSY = "มีรายการรอยืนยัน รอสักครู่แล้วลองใหม่"}
+local battle, battleRequest, renderBattle
+local battleLabel, combatLog, skillButtons
+local battleBusy = false
+local skillNames = {S01 = "ตะปบ", S02 = "กระแทกกระดอง", U01 = "เจาะเกราะ", U02 = "โจมตีหนัก", F01 = "เปลวไฟ", W01 = "คลื่นคุ้มกัน"}
+local errors = {EXPIRED_INTENT = "รายการหมดอายุ กรุณาดูโอกาสและยืนยันใหม่", STALE_PREVIEW = "ตัวอย่างหมดอายุหรือข้อมูลเปลี่ยน กรุณาดูโอกาสใหม่", CREATURE_LOCKED = "ปลดล็อกตัวละครก่อนผสม", CREATURE_NOT_FOUND = "ไม่พบตัวละครต้นทาง กรุณาเลือกใหม่", IN_BATTLE = "รอให้การต่อสู้จบก่อน", OUT_OF_RANGE = "เดินเข้าใกล้จุดเก็บไข่หรือสนามฝึก (ไม่เกิน 12 studs)", NODE_UNAVAILABLE = "จุดนี้ยังไม่พร้อม รอครบ 90 วินาที", INSUFFICIENT_FUNDS = "เหรียญไม่พอ", NO_EGG = "ยังไม่มีไข่", CAPACITY_FULL = "ช่องเก็บเต็ม", NOTHING_TO_CLAIM = "ไม่มีไข่รอรับ", RATE_LIMITED = "ทำรายการเร็วเกินไป กรุณารอสักครู่", STALE_PROFILE = "ข้อมูลเปลี่ยนแล้ว กรุณาลองใหม่", INTENT_BUSY = "มีรายการรอยืนยัน รอสักครู่แล้วลองใหม่"}
 remotes.GameResponse.OnClientEvent:Connect(function(response)
     local slot = pending[response.requestId]
     if slot then slot.response = response end
 end)
+errors.STALE_BATTLE = "ข้อมูลเทิร์นเปลี่ยนแล้ว กำลังอ่านสถานะใหม่"
+errors.SKILL_LOCKED = "สกิลนี้ยังไม่ปลดล็อก"
+errors.SKILL_COOLDOWN = "สกิลยังไม่พร้อม ใช้โจมตีพื้นฐานได้"
+errors.BATTLE_ENDED = "แมตช์จบแล้ว"
+errors.OPERATION_BUSY = "มีรายการค้างอยู่ รอให้เสร็จหรือหมดอายุก่อนเข้าสนาม"
 local function request(action, args)
     local id = HttpService:GenerateGUID(false)
     local slot = {}
@@ -90,11 +99,11 @@ local function apply(view)
     for _, child in ipairs(collection:GetChildren()) do if child:IsA("Frame") then child:Destroy() end end
     for _, creature in ipairs(view.creatures) do
         local row = Instance.new("Frame")
-        row.Size = UDim2.new(1, -8, 0, 56)
+        row.Size = UDim2.new(1, -8, 0, 92)
         row.BackgroundTransparency = 1
         row.Parent = collection
         local choose = Instance.new("TextButton")
-        choose.Size = UDim2.new(0.72, -4, 1, 0)
+        choose.Size = UDim2.new(0.72, -4, 0, 56)
         choose.TextSize = 14
         choose.TextWrapped = true
         local picked = table.find(selected, creature.instanceId) ~= nil
@@ -113,12 +122,23 @@ local function apply(view)
             apply(profile)
         end)
         local lock = Instance.new("TextButton")
-        lock.Size = UDim2.new(0.28, 0, 1, 0)
+        lock.Size = UDim2.new(0.28, 0, 0, 56)
         lock.Position = UDim2.fromScale(0.72, 0)
         lock.Text = if creature.isLocked then "ปลดล็อก" else "ล็อก"
         lock.TextSize = 14
         lock.Parent = row
         lock.Activated:Connect(function() mutate("Creature.SetLocked", {creatureId = creature.instanceId, locked = not creature.isLocked}) end)
+        local train = Instance.new("TextButton")
+        train.Size = UDim2.new(1, 0, 0, 30)
+        train.Position = UDim2.fromOffset(0, 59)
+        train.TextSize = 14
+        train.Text = "ฝึกด้วย " .. creature.definitionId .. " • XP " .. creature.totalXP
+        train.BackgroundColor3 = Color3.fromRGB(65, 99, 155)
+        train.TextColor3 = Color3.new(1, 1, 1)
+        train.Parent = row
+        train.Activated:Connect(function()
+            battleRequest("Battle.Start", {creatureId = creature.instanceId, encounterId = "TRAINING"})
+        end)
     end
 end
 local function refresh()
@@ -128,13 +148,15 @@ local function refresh()
 end
 remotes.GamePush.OnClientEvent:Connect(function(push)
     if push.event == "ProfileChanged" then apply(push.data) end
+    if push.event == "BattleChanged" and renderBattle then renderBattle(push.data) end
     if push.event == "WorldChanged" then
         worldLabel.Text = push.data.timeOfDay .. " • " .. push.data.weather
         if preview and preview.world.phaseId ~= push.data.phaseId then clearPreview() end
     end
 end)
 mutate = function(kind, params)
-    if busy or not profile then return end
+    if busy or battleBusy or not profile then return end
+    if battle and battle.status ~= "ended" then notice.Text = errors.IN_BATTLE; return end
     busy = true
     presentingHatch = kind == "Egg.Hatch"
     notice.Text = "กำลังบันทึก…"
@@ -185,6 +207,77 @@ button("ฟักไข่", "Egg.Hatch", {})
 button("ซื้อไข่ • 40 เหรียญ", "Egg.Buy", {quantity = 1})
 for _, id in ipairs({"N01", "N02", "N03"}) do nodeButtons[id] = button("เก็บไข่ " .. id, "Egg.Collect", {nodeId = id}) end
 local claimButton = button("รับไข่รางวัลค้าง", "Reward.ClaimPendingEggs", {})
+label("สนามฝึก • เดินไปแท่นสีน้ำเงิน", 32)
+battleLabel = label("เลือกปุ่มฝึกใต้ตัวละคร • ตัวที่ล็อกก็ฝึกได้", 100)
+combatLog = label("ชนะ: 20 เหรียญ + 20 XP • ไข่ครั้งแรกแน่นอน", 64)
+local basicButton = button("โจมตีพื้นฐาน", nil, nil, function()
+    if battle and battle.status == "active" then
+        battleRequest("Battle.Action", {battleId = battle.battleId, expectedRevision = battle.revision, command = "BASIC"})
+    end
+end)
+skillButtons = {}
+for index = 1, 3 do
+    skillButtons[index] = button("สกิล", nil, nil, function()
+        local skill = battle and battle.player.skills[index]
+        if not skill or battle.status ~= "active" then return end
+        if battle.player.ownerTurnIndex < skill.readyAtOwnerTurn then notice.Text = errors.SKILL_COOLDOWN; return end
+        battleRequest("Battle.Action", {battleId = battle.battleId, expectedRevision = battle.revision, command = "SKILL", skillId = skill.skillId})
+    end)
+    skillButtons[index].Visible = false
+end
+local forfeitButton = button("ถอนตัว • ไม่เสียของ", nil, nil, function()
+    if battle and battle.status == "active" then battleRequest("Battle.Forfeit", {battleId = battle.battleId, expectedRevision = battle.revision}) end
+end)
+basicButton.Visible, forfeitButton.Visible = false, false
+renderBattle = function(view)
+    if battle and battle.battleId == view.battleId and view.revision < battle.revision then return end
+    battle = view
+    local active = view.status == "active"
+    local status = if view.status == "resolving" then "กำลังยืนยันรางวัล…" elseif active then "เลือกท่าของคุณ" elseif view.outcome == "win" then "ชนะ • บันทึกรางวัลแล้ว" elseif view.outcome == "loss" then "แพ้ • ไม่เสียของ เริ่มใหม่ได้" else "ถอนตัวแล้ว • ไม่เสียของ"
+    battleLabel.Text = string.format("รอบ %d • %s\nคุณ %s HP %d/%d • Shield %d\nคู่ฝึก %s HP %d/%d • Shield %d", view.roundIndex, status, view.player.definitionId, view.player.currentHP, view.player.stats.hp, view.player.shield, view.enemy.definitionId, view.enemy.currentHP, view.enemy.stats.hp, view.enemy.shield)
+    basicButton.Visible, forfeitButton.Visible = active, active
+    for index, item in ipairs(skillButtons) do
+        local skill = view.player.skills[index]
+        item.Visible = active and skill ~= nil
+        if skill then
+            local waitTurns = math.max(0, skill.readyAtOwnerTurn - view.player.ownerTurnIndex)
+            item.Text = (skillNames[skill.skillId] or skill.skillId) .. (if waitTurns > 0 then " • รอ " .. waitTurns .. " เทิร์น" else " • พร้อม")
+            item.BackgroundColor3 = if waitTurns > 0 then Color3.fromRGB(75, 80, 90) else Color3.fromRGB(48, 113, 105)
+        end
+    end
+end
+battleRequest = function(action, args)
+    if busy or battleBusy then return end
+    battleBusy = true
+    local response = request(action, args)
+    if response.data and response.data.battle then
+        renderBattle(response.data.battle)
+        local lines = {}
+        for _, event in ipairs(response.data.events or {}) do
+            table.insert(lines, string.format("%s: %s → HP -%d / Shield กัน %d", if event.actor == "player" then "คุณ" else "คู่ฝึก", skillNames[event.skillId] or "โจมตี", event.hpDamage, event.shieldAbsorbed))
+        end
+        if #lines > 0 then combatLog.Text = table.concat(lines, "\n") end
+    end
+    if response.status == "rejected" then
+        local code = response.error and response.error.code or "PROFILE_NOT_READY"
+        notice.Text = errors[code] or code
+        if action ~= "Battle.Get" then
+            local snapshot = request("Battle.Get")
+            if snapshot.data and snapshot.data.battle then renderBattle(snapshot.data.battle) end
+        end
+    elseif response.status == "pending" then notice.Text = "กำลังตรวจสถานะการต่อสู้หรือรางวัล…"
+    elseif battle and battle.status == "ended" then
+        refresh()
+        notice.Text = if battle.outcome == "win" then "รับรางวัลแล้ว • ดู Level/ดาว/ไข่ในคอลเลกชัน" else "เริ่มแมตช์ใหม่ได้ด้วย HP เต็ม"
+    else notice.Text = "เลือกโจมตีพื้นฐานหรือสกิล" end
+    battleBusy = false
+end
+-- Read recovery snapshots with fresh request IDs; a cached pending response is not final.
+task.spawn(function()
+    while task.wait(1) do
+        if battle and battle.status == "resolving" and not battleBusy and not busy then battleRequest("Battle.Get", {}) end
+    end
+end)
 label("คอลเลกชัน • เลือกต้นทาง 2 ตัวเพื่อผสม")
 collection.Parent = panel
 selectionLabel = label("เลือกแล้ว 0/2 ตัว")

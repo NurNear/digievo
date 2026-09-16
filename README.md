@@ -13,14 +13,23 @@ https://github.com/NurNear/digievo
 
 ## Local Test Place
 
-Current scope includes I-01 domain rules, I-02 profile/recovery, I-03 RPC and
-I-04 egg/collection and I-05 mixing gameplay using an in-memory backend. The local UI supports
-collecting at three nodes, buying/hatching eggs, locking creatures and claiming
-pending egg rewards. Select two unlocked creatures to preview rarity, stars and
-inherited skills, then explicitly confirm the 20-coin mix. Both parents are consumed
-and replaced by one level-one child. Battle gameplay is not implemented yet.
+Current local scope includes I-01 domain rules, I-02 profile/recovery, I-03 RPC,
+I-04 egg/collection, I-05 mixing, and I-06 training battles/progression.
+The Thai UI supports collecting at three nodes, buying/hatching eggs, locking
+creatures, claiming pending eggs, and previewing/confirming a 20-coin mix.
+Walk to the blue training pad and choose a creature's training button. Select
+BASIC or an unlocked skill each turn; Speed, owner-turn cooldowns and shields are
+resolved by the server. Winning grants 20 coins, 20 XP (up to the cap), one win
+of Potential progress, and a guaranteed first victory egg (20% thereafter).
+Full egg inventories keep battle rewards pending. Losing or forfeiting costs
+nothing. Locked creatures can train. Economic actions wait until combat and
+reward confirmation finish.
+
 Stopping Play discards the test profile; cloud persistence remains disabled.
-See [I-05 verification](docs/testing/I-05_RESULTS.md).
+I-06 CLI verification and the Studio walkthrough are documented in
+[I-06 verification](docs/testing/I-06_RESULTS.md). Studio Play/manual battle
+verification is still pending; the prior I-05 walkthrough is recorded in
+[I-05 verification](docs/testing/I-05_RESULTS.md).
 
 On this Intel Mac:
 
@@ -29,12 +38,14 @@ On this Intel Mac:
 .tools/luau-0.738/luau tests/persistence-run.luau
 .tools/luau-0.738/luau tests/eggs-run.luau
 .tools/luau-0.738/luau tests/mix-run.luau
+.tools/luau-0.738/luau tests/battle-run.luau
 .tools/rojo-7.7.0/rojo build default.project.json -o build/RobloxMVP_LocalTest.rbxlx
 open -a RobloxStudio build/RobloxMVP_LocalTest.rbxlx
 ```
 
 Press Play, hatch the starter egg, walk near a gold node and collect another.
-The panel shows node cooldowns, inventory and lock buttons. Local tool binaries
+The panel shows node cooldowns, inventory and lock buttons. Walk to the blue
+training pad, then press a creature's training button to enter battle. Local tool binaries
 are ignored by Git; Luau 0.738 was built from source for Intel macOS.
 
 Rojo is pinned in `aftman.toml` to the stable 7.7.0 version.

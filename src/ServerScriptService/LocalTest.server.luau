@@ -9,6 +9,8 @@ local DomainRules = require(shared:WaitForChild("DomainRules"))
 local Suite = require(game:GetService("ServerStorage"):WaitForChild("DomainRulesTests"))
 local result = Suite.run(DomainRules, Catalog)
 workspace:SetAttribute("Environment", "LocalTest")
+workspace:SetAttribute("BuildLabel", "WORLD AUTO v2")
+print("DIGIEVO WORLD AUTO v2: real-time server attacks, immediate skills, world arena.")
 workspace:SetAttribute("PersistenceEnabled", false)
 workspace:SetAttribute("DomainRulesReady", true)
 workspace:SetAttribute("DomainTestAssertions", result.checks)
@@ -60,6 +62,21 @@ rpcModules.Battle = require(script.Parent.Gameplay.BattleService)
 local battleResult = require(game:GetService("ServerStorage").BattleTests).run(rpcModules, rules, Catalog)
 workspace:SetAttribute("BattleTestChecks", battleResult.checks)
 print(string.format("I-06 PASS: %d checks. Memory backend only.", battleResult.checks))
+
+local presentation = game:GetService("ReplicatedStorage"):WaitForChild("Presentation")
+local feedResult = require(game:GetService("ServerStorage").BattleFeedTests).run(require(presentation.BattleFeed))
+print(string.format("Battle feed PASS: %d checks.", feedResult.checks))
+local journeyResult = require(game:GetService("ServerStorage").JourneyTests).run(require(presentation.Guide), require(presentation.PetStyles), Catalog)
+workspace:SetAttribute("JourneyTestChecks", journeyResult.checks)
+print(string.format("I-07 PASS: %d checks. Journey guidance and visual catalog; rendering requires Play verification.", journeyResult.checks))
+
+-- Heavy fault injection is opt-in so ordinary playtesting starts quickly.
+if workspace:GetAttribute("RunSafetyTests") == true then
+    local safetyResult = require(game:GetService("ServerStorage").SafetyTests).run(rpcModules, rules, Catalog)
+    workspace:SetAttribute("SafetyTestChecks", safetyResult.checks)
+    workspace:SetAttribute("SafetyFaultRuns", safetyResult.faultRuns)
+    print(string.format("I-08 PASS: %d checks; %d simulated fault scenarios.", safetyResult.checks, safetyResult.faultRuns))
+end
 
 local schema = modules.Schema.new(rules, measure)
 local repository = modules.Repository.new({
@@ -130,9 +147,12 @@ trainingText.TextSize = 18
 trainingText.TextWrapped = true
 trainingText.Text = "สนามฝึก • คู่ฝึก HP 60%\nเลือกตัวละครแล้วกดฝึก"
 trainingText.Parent = sign
+local LocalWorld = require(script.Parent.Presentation.LocalWorld)
+LocalWorld.build(nodes, training)
+LocalWorld.update(rules.worldAt(os.time()))
 local random = Random.new()
 local battle
-local gameplayOptions = {rules = rules, catalog = Catalog, views = rpcModules.Views,
+local gameplayOptions = {clock = function() return workspace:GetServerTimeNow() end, rules = rules, catalog = Catalog, views = rpcModules.Views,
     nearNode = nearNode, inBattle = function(userId) return battle and battle.inBattle(userId) or false end,
     nextNumber = function() return random:NextNumber() end,
     newId = function() return HttpService:GenerateGUID(false) end,
@@ -155,18 +175,41 @@ for _, name in ipairs({"GameRequest", "GameResponse", "GamePush"}) do
     remote.Name = name
     remote.Parent = remotes
 end
-remotes.GameRequest.OnServerEvent:Connect(function(player, request)
-    local key = active[player]
-    if not key then return end
-    local response = dispatcher.handle(key, request)
-    remotes.GameResponse:FireClient(player, response)
+local function publish(player, response)
     if response.data and response.data.battle then
         remotes.GamePush:FireClient(player, {apiVersion = 1, event = "BattleChanged", data = response.data.battle})
     end
     if response.status == "committed" or (response.data and response.data.battle and response.data.battle.status == "ended") then
+        local key = active[player]
+        if not key then return end
         local snapshot = sessions.snapshot(key)
         if snapshot.status == "ok" then
             remotes.GamePush:FireClient(player, {apiVersion = 1, event = "ProfileChanged", data = rpcModules.Views.profile(rules, Catalog, snapshot.profile)})
+        end
+    end
+end
+remotes.GameRequest.OnServerEvent:Connect(function(player, request)
+    local key = active[player]
+    if not key then return end
+    local response = dispatcher.handle(key, request)
+    if active[player] ~= key then return end
+    remotes.GameResponse:FireClient(player, response)
+    publish(player, response)
+end)
+-- A slow reward write for one player must not stop other players' fights.
+local ticking = {}
+task.spawn(function()
+    while task.wait(0.05) do
+        for player, key in pairs(active) do
+            if not ticking[player] then
+                ticking[player] = true
+                task.spawn(function()
+                    local ok, response = pcall(battle.tick, key)
+                    ticking[player] = nil
+                    if not ok then warn("Battle tick failed", response); return end
+                    if response and active[player] == key then publish(player, response) end
+                end)
+            end
         end
     end
 end)
@@ -209,6 +252,7 @@ task.spawn(function()
         local world = rpcModules.Views.world(rules, os.time())
         if world.phaseId ~= previousPhase then
             previousPhase = world.phaseId
+            LocalWorld.update(world)
             remotes.GamePush:FireAllClients({apiVersion = 1, event = "WorldChanged", data = world})
         end
     end

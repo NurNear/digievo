@@ -35,6 +35,10 @@ end
 function DomainRules.new(source)
     local config = frozenCopy(source)
     local definitions, rarityIndex = {}, {}
+    positive(config.combat.baseAttackSeconds)
+    positive(config.combat.minAttackSeconds)
+    positive(config.combat.shieldSeconds)
+    assert(finite(config.combat.speedSecondsPerPoint) and config.combat.speedSecondsPerPoint >= 0, "INVALID_SPEED_INTERVAL")
     assert(type(config.rulesVersion) == "string" and #config.rulesVersion > 0, "INVALID_VERSION")
     assert(#config.creatures == 8 and #config.rarities == 4, "INVALID_CATALOG_SIZE")
     for index, rarity in ipairs(config.rarities) do
@@ -44,7 +48,7 @@ function DomainRules.new(source)
     for _, skill in pairs(config.skills) do
         positive(skill.multiplier)
         positive(skill.targetDefenseFactor)
-        integer(skill.cooldownOwnerTurns, 0, MAX_INTEGER)
+        assert(finite(skill.cooldownSeconds) and skill.cooldownSeconds >= 0, "INVALID_COOLDOWN")
         assert(skill.sourceStat == "atk" or skill.sourceStat == "def", "INVALID_SOURCE_STAT")
         assert(finite(skill.shieldFraction) and skill.shieldFraction >= 0 and skill.shieldFraction <= 1, "INVALID_SHIELD")
         assert(skill.compatibility == "Species" or skill.compatibility == "Element" or skill.compatibility == "Universal", "INVALID_COMPATIBILITY")
@@ -302,9 +306,14 @@ function DomainRules.new(source)
         return { rawDamage = raw, hpDamage = math.max(0, raw - shield), remainingShield = 0 }
     end
 
-    function rules.readyTurn(skillId, usedTurn)
-        integer(usedTurn, 1, MAX_INTEGER - 3)
-        return usedTurn + assert(config.skills[skillId], "UNKNOWN_SKILL").cooldownOwnerTurns + 1
+    function rules.readyAt(skillId, usedAt)
+        assert(finite(usedAt) and usedAt >= 0, "INVALID_TIME")
+        return usedAt + assert(config.skills[skillId], "UNKNOWN_SKILL").cooldownSeconds
+    end
+
+    function rules.attackInterval(speed)
+        integer(speed, 1, MAX_INTEGER)
+        return math.max(config.combat.minAttackSeconds, config.combat.baseAttackSeconds - speed * config.combat.speedSecondsPerPoint)
     end
 
     return table.freeze(rules)

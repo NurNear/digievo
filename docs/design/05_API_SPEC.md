@@ -38,6 +38,8 @@ CandidateView:`{definitionId,probability,conditionalProbability,resetPotential:b
 1. `Operation.Create`: args`{kind,params}` → ok data`{operationId,expiresAt}`. servervalidate/schemaและออกintentในmemoryอายุ60s ยังไม่writeและยังไม่สุ่มลูก. ClientretryrequestIdเดิมต้องได้intentเดิม; หากหายหลังreconnectใช้Profile.Getหาprepared/receipt ไม่executeด้วยIDสุ่มเอง
 2. `Operation.Execute`: args`{operationId}` → pending/prepared/committedหรือrejected. serverใช้paramsที่ผูกไว้ ไม่รับparamsใหม่ในExecute. หนึ่งmutationinflight/profile
 
+การออก intent เดิมซ้ำคืน `expiresAt` เดิม ไม่ต่ออายุ. `Operation.Get` ตรวจ prepared/receipt ก่อน expiry และ recover สถานะที่ไม่แน่นอนจาก backend; หากเคย Execute แล้วแต่ PREPARE ยังไม่สำเร็จ จะ retry ด้วย params เดิมผ่าน validation เดิม. การอ่าน intent ที่ยังไม่เคย Execute ไม่เริ่ม mutation. Intent ที่หมดอายุและไม่มี prepared/receipt คืน `EXPIRED_INTENT`.
+
 | kind | params | Receipt.result เมื่อcommitted |
 |---|---|---|
 | Egg.Collect | `{nodeId:"N01"|"N02"|"N03"}` | `{nodeId,nextAvailableAt,eggDelta:1}` |
@@ -60,13 +62,23 @@ sameIDต่างinputจากOperation.Create retryให้IDEMPOTENCY_CONFL
 | action | args | result |
 |---|---|---|
 | Battle.Start | `{creatureId,encounterId:"TRAINING"}` | ok `{battle:BattleView}` เลือกC01/C02ศัตรู50/50, D-18 |
-| Battle.Action | `{battleId,expectedRevision,command:"BASIC"|"SKILL",skillId?:string}` | ok `{battle:BattleView,events:CombatEvent[]}` หรือpendingเมื่อรางวัลกำลังบันทึก |
+| Battle.Action | `{battleId,expectedRevision,command:"SKILL",skillId:string}` | ok `{battle:BattleView,events:CombatEvent[]}` หรือpendingเมื่อรางวัลกำลังบันทึก |
 | Battle.Forfeit | `{battleId,expectedRevision}` | ok `{outcome:"forfeit"}` ไม่มีpenalty/reward |
 
-BASICห้ามskillId, SKILLต้องมีและเป็นสกิลที่ปลดล็อก/พร้อมใช้; ตรวจowner/activeSide/revisionก่อนแก้state. retryrequestIdเดิมคืนcachedresult; requestใหม่ที่revisionเก่าให้STALE_BATTLE ไม่ทำอีกคำสั่ง. Serverออกคำสั่งenemy BASICเองหลังถึงเทิร์น ไม่มีrouteให้clientสั่งศัตรู
+Realtime (2026-10-02): server tick schedules both fighters' BASIC attacks independently.
+Battle.Action is SKILL only, applies immediately, and validates ownership, active
+battle and server `readyAt` seconds. `expectedRevision` must be a positive integer
+no newer than the current revision; older observations are accepted because auto
+hits may race the request. A different battle ID is still rejected. Replay with
+the same requestId returns the cached result; new requests cannot bypass cooldown.
+Battle.Get `{}` returns `{battle?:BattleView}` and can recover a pending reward.
 
-BattleView: `{battleId,revision,status:"active"|"resolving"|"ended",roundIndex,activeSide:"player"|"enemy",player:BattleFighter,enemy:BattleFighter,rewardOperationId?:string,outcome?:"win"|"loss"|"forfeit"}`
-BattleFighter:`{definitionId,stats:{hp,atk,def,spd},currentHP,shield,ownerTurnIndex,skills:{skillId,readyAtOwnerTurn}[]}`. CombatEvent:`{actor,command,skillId?:string,rawDamage,shieldAbsorbed,hpDamage,targetHP,shieldGranted}`; ทุกdamageเป็นinteger>=0
+BattleView: `{battleId,revision,status,startedAt,serverTime,player,enemy,events,rewardOperationId?,outcome?}`.
+BattleFighter: `{definitionId,stats:{hp,atk,def,spd},currentHP,shield,shieldExpiresAt,attackInterval,nextAttackAt,skills:{skillId,readyAt,cooldownSeconds}[]}`.
+CombatEvent: `{seq,at,actor,command,skillId?,rawDamage,shieldAbsorbed,hpDamage,targetHP,shieldGranted}`.
+Full snapshots retain the last 24 events. GamePush publishes changed battle views;
+clients deduplicate event seq and reject non-increasing snapshot revisions.
+No roundIndex, activeSide or owner-turn cooldown fields remain.
 
 หนึ่งactivebattleต่อผู้เล่น; ระหว่างbattleปฏิเสธmutationเศรษฐกิจทั้งหมด ไม่เริ่มbattleเมื่อมีpendingmutation. Loss/forfeitปล่อยstateทันที ไม่มีwriteรางวัล; winเปลี่ยนresolving จนinternaloperationcommitก่อนเริ่มต่อ. Disconnectยกเลิกแมตช์ memory แต่preparedrewardยังrecover
 
@@ -93,6 +105,8 @@ GamePush: `{apiVersion:1,event:"ProfileChanged"|"WorldChanged"|"BattleChanged"|"
 Rejectedหมายถึงไม่มีdomainmutationจากrequestที่ถูกrejectนั้น; หากoperationเดียวกันเคยprepared/committedต้องlookupแล้วคืนสถานะนั้นก่อนreject. ข้อผิดพลาดtransportไม่ใช่หลักฐานrejected
 
 ## Limits และตัวอย่าง
+Ingress ต่อผู้เล่น burst 40, เติม 20 requests/วินาที ก่อนตรวจ envelope, fingerprint และ replay; malformed/unknown/cached requests นับด้วย. Fingerprint จำกัดรวม 256 table entries, depth 12 และ budget 8KiB; strings ระบุความยาวเพื่อกัน delimiter collision. Unknown routes ไม่สร้าง action bucket. Disconnect ล้าง ingress ของผู้เล่น.
+
 request<=8KiB, ID<=128ตัวอักษร, mutation1inflight/1s burst2; Operation.Createใช้bucketเดียวกัน; preview2/s burst4; battle2/s burst2; reads/status1/s burst2. invalid/rate-limitไม่เรียกDataStorewrite. serverresponseไม่ใช้8KiBrequestlimit แต่ต้องส่งเฉพาะpublicfields; profileprojectionต้องไม่เกิน256KiB
 
 ```json

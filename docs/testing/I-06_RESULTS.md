@@ -1,5 +1,8 @@
 # I-06 Verification — 2026-09-16
 
+Historical turn-based verification. Current combat was replaced with server-driven
+real time on 2026-10-02; see [Realtime results](REALTIME_RESULTS.md).
+
 ## Implemented
 
 - Server-owned TRAINING battles with C01/C02 at equal probability, level one,
@@ -69,3 +72,19 @@ No Studio Play or manual UI result is claimed yet. There is no automated native
 UI control available for Roblox Studio in this session. Multi-client networking,
 real DataStore/two-server recovery, performance and child playtest remain unverified.
 This place is unpublished and memory-only; stopping Play discards all test data.
+
+## Simplified UI and box pets — 2026-10-02
+
+- Replaced the single long menu with Pets, Eggs, Mix and Battle tabs, larger
+  action buttons, creature display names and a width-constrained panel.
+- Added a client-only ViewportFrame arena with two block pets, element colors,
+  HP bars, attack lunges, hit flashes, impact bursts and damage/shield text.
+- Presentation consumes server events in order (including an enemy opening
+  attack). Battle pushes are deferred during requests/animation; action buttons
+  stay disabled until presentation completes. Server combat rules are unchanged.
+- Verified: both client files compile; battle suite passes 188 checks; Rojo builds
+  `build/RobloxMVP_LocalTest.rbxlx`; `git diff --check` passes.
+- Studio visual/manual verification remains pending. Check all four tabs at
+  desktop and narrow window sizes, hatch then train, use skills through cooldown,
+  observe both attack orders, shield absorption, defeat/victory and forfeit.
+  Verify mix selection/preview/confirmation and return to Pets after rewards.

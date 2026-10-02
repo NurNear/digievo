@@ -148,7 +148,7 @@ function Suite.run(DomainRules, Catalog)
         hpA = math.max(0, hpA - rules.damage(b, a.def, bSkill, 0).hpDamage)
     end
     check(hpA == 0 and hpB == 18, "D-15 four-round damage example")
-    check(rules.readyTurn("S01", 1) == 4, "Cooldown uses owner turns")
+    check(rules.readyAt("S01", 1.25) == 7.25, "Cooldown uses elapsed seconds")
     check(rules.damage(a, b.def, "U01", 0).rawDamage == 27, "Pierce example")
     check(rules.damage(a, b.def, "U02", 0).rawDamage == 28, "Heavy Strike example")
     local shield = rules.damage({ atk = 20 }, 0, "BASIC", 8)

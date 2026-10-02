@@ -4,6 +4,7 @@ function BattleService.new(options)
     local rules, catalog, views = options.rules, options.catalog, options.views
     local repository, copy = options.repository, options.copy
     local battles, busy, service = {}, {}, {}
+    local now = assert(options.clock, "Combat clock required")
     local function check(value, code) if not value then error({code = code}, 0) end end
     local function fields(args, allowed)
         check(type(args) == "table", "INVALID_INPUT")
@@ -19,7 +20,7 @@ function BattleService.new(options)
     end
     local function public(battle)
         return copy({battleId = battle.battleId, revision = battle.revision, status = battle.status,
-            roundIndex = battle.roundIndex, activeSide = battle.activeSide, player = battle.player, enemy = battle.enemy,
+            startedAt = battle.startedAt, serverTime = now(), player = battle.player, enemy = battle.enemy, events = battle.events,
             rewardOperationId = battle.rewardOperationId, outcome = battle.outcome})
     end
     local function result(battle, events)
@@ -34,63 +35,56 @@ function BattleService.new(options)
         if not ok then error(response, 0) end
         return response
     end
-    local function fighter(creature, enemy)
+    local function fighter(creature, enemy, at)
         local view = views.creature(rules, catalog, creature)
         local skills, seen = {}, {}
         if not enemy then
             for _, slot in ipairs(view.slots) do
                 if slot.unlocked and slot.skillId and not seen[slot.skillId] then
                     seen[slot.skillId] = true
-                    table.insert(skills, {skillId = slot.skillId, readyAtOwnerTurn = 1})
+                    table.insert(skills, {skillId = slot.skillId, readyAt = at, cooldownSeconds = catalog.skills[slot.skillId].cooldownSeconds})
                 end
             end
         end
         return {definitionId = creature.definitionId, stats = view.stats,
             currentHP = if enemy then math.floor(view.stats.hp * 60 / 100) else view.stats.hp,
-            shield = 0, ownerTurnIndex = 0, skills = skills}
+            shield = 0, shieldExpiresAt = 0, attackInterval = rules.attackInterval(view.stats.spd),
+            nextAttackAt = at + rules.attackInterval(view.stats.spd), skills = skills}
     end
-    local function beginTurn(battle, side)
-        battle.activeSide = side
-        battle[side].ownerTurnIndex += 1
-        battle[side].shield = 0
+    local function expireShield(fighter, at)
+        if fighter.shield > 0 and at >= fighter.shieldExpiresAt then
+            fighter.shield, fighter.shieldExpiresAt = 0, 0
+            return true
+        end
+        return false
     end
-    local function beginRound(battle)
-        battle.roundIndex += 1
-        local first
-        if battle.player.stats.spd == battle.enemy.stats.spd then
-            first = if battle.firstSide then (if battle.firstSide == "player" then "enemy" else "player") else (if roll() < 0.5 then "player" else "enemy")
-        else first = if battle.player.stats.spd > battle.enemy.stats.spd then "player" else "enemy" end
-        battle.firstSide, battle.turnInRound = first, 1
-        beginTurn(battle, first)
-    end
-    local function advance(battle)
-        if battle.turnInRound == 1 then
-            battle.turnInRound = 2
-            beginTurn(battle, if battle.firstSide == "player" then "enemy" else "player")
-        else beginRound(battle) end
-    end
-    local function strike(battle, side, skillId, events)
+    local function strike(battle, side, skillId, events, at)
         local attacker = battle[side]
         local target = battle[if side == "player" then "enemy" else "player"]
+        expireShield(target, at)
+        expireShield(attacker, at)
         local damage = rules.damage(attacker.stats, target.stats.def, skillId, target.shield)
         local absorbed = math.min(target.shield, damage.rawDamage)
-        target.shield = 0
+        target.shield, target.shieldExpiresAt = 0, 0
         target.currentHP = math.max(0, target.currentHP - damage.hpDamage)
         local granted = if target.currentHP > 0 then rules.shieldAmount(skillId, attacker.stats.hp) else 0
-        attacker.shield = granted
-        for _, skill in ipairs(attacker.skills) do
-            if skill.skillId == skillId then skill.readyAtOwnerTurn = rules.readyTurn(skillId, attacker.ownerTurnIndex) end
+        if granted > 0 then
+            attacker.shield, attacker.shieldExpiresAt = granted, at + catalog.combat.shieldSeconds
         end
-        table.insert(events, {actor = side, command = if skillId == "BASIC" then "BASIC" else "SKILL",
+        for _, skill in ipairs(attacker.skills) do
+            if skill.skillId == skillId then skill.readyAt = rules.readyAt(skillId, at) end
+        end
+        battle.eventSeq += 1
+        local event = {seq = battle.eventSeq, at = at, actor = side, command = if skillId == "BASIC" then "BASIC" else "SKILL",
             skillId = if skillId ~= "BASIC" then skillId else nil, rawDamage = damage.rawDamage,
-            shieldAbsorbed = absorbed, hpDamage = damage.hpDamage, targetHP = target.currentHP, shieldGranted = granted})
+            shieldAbsorbed = absorbed, hpDamage = damage.hpDamage, targetHP = target.currentHP, shieldGranted = granted}
+        table.insert(events, event)
+        table.insert(battle.events, event)
+        if #battle.events > 24 then table.remove(battle.events, 1) end
         if target.currentHP == 0 then
             battle.outcome = if side == "player" then "win" else "loss"
             battle.status = if side == "player" then "resolving" else "ended"
-        else advance(battle) end
-    end
-    local function enemyTurns(battle, events)
-        while battle.status == "active" and battle.activeSide == "enemy" do strike(battle, "enemy", "BASIC", events) end
+        end
     end
     local function rewardPlan(battle, profile)
         local creature = profile.creatures[battle.creatureId]
@@ -154,10 +148,11 @@ function BattleService.new(options)
             if reserved.status ~= "ok" then return reserved end
             local ok, response = pcall(function()
                 local enemy = {definitionId = if roll() < 0.5 then "C01" else "C02", totalXP = 0, startingPotentialStars = 0, winsSinceCreation = 0}
-                local battle = {battleId = battleId, creatureId = args.creatureId, revision = 1, status = "active", roundIndex = 0,
-                    player = fighter(creature, false), enemy = fighter(enemy, true)}
-                beginRound(battle)
-                local events = {}; enemyTurns(battle, events)
+                local at = now()
+                local battle = {battleId = battleId, creatureId = args.creatureId, revision = 1, status = "active", startedAt = at,
+                    eventSeq = 0, events = {}, tieSide = if roll() < 0.5 then "player" else "enemy",
+                    player = fighter(creature, false, at), enemy = fighter(enemy, true, at)}
+                local events = {}
                 battles[userId] = battle
                 if battle.status == "ended" then repository.endBattle(userId, battleId) end
                 return result(battle, events)
@@ -171,30 +166,68 @@ function BattleService.new(options)
         check(type(args.expectedRevision) == "number" and args.expectedRevision % 1 == 0 and args.expectedRevision >= 1 and args.expectedRevision <= 9007199254740991, "INVALID_INPUT")
         local battle = battles[userId]
         check(battle ~= nil and battle.battleId == args.battleId, "STALE_BATTLE")
-        check(battle.revision == args.expectedRevision, "STALE_BATTLE")
+        -- A skill may race a server auto hit. Older observed revisions are valid;
+        -- battle identity, current HP and readyAt are still checked on the server.
+        check(args.expectedRevision <= battle.revision, "STALE_BATTLE")
         check(battle.status == "active", "BATTLE_ENDED")
-        check(battle.activeSide == "player", "NOT_YOUR_TURN")
         return battle
     end
     function service.action(userId, args)
         return guarded(userId, function()
             fields(args, {battleId = true, expectedRevision = true, command = true, skillId = true})
             local battle = current(userId, args)
-            local skillId
-            if args.command == "BASIC" then check(args.skillId == nil, "INVALID_INPUT"); skillId = "BASIC"
-            else
-                check(args.command == "SKILL", "INVALID_INPUT"); id(args.skillId)
-                local found
-                for _, skill in ipairs(battle.player.skills) do if skill.skillId == args.skillId then found = skill end end
-                check(found ~= nil, "SKILL_LOCKED")
-                check(battle.player.ownerTurnIndex >= found.readyAtOwnerTurn, "SKILL_COOLDOWN")
-                skillId = args.skillId
-            end
+            check(args.command == "SKILL", "INVALID_INPUT"); id(args.skillId)
+            local found
+            for _, skill in ipairs(battle.player.skills) do if skill.skillId == args.skillId then found = skill end end
+            check(found ~= nil, "SKILL_LOCKED")
+            check(now() >= found.readyAt, "SKILL_COOLDOWN")
+            local skillId = args.skillId
             local snapshot = repository.snapshot(userId)
             if snapshot.status ~= "ok" then return snapshot end
             local events = {}
-            strike(battle, "player", skillId, events)
-            enemyTurns(battle, events)
+            strike(battle, "player", skillId, events, now())
+            battle.revision += 1
+            if battle.status == "ended" then repository.endBattle(userId, battle.battleId) end
+            resolve(userId, battle)
+            return result(battle, events)
+        end)
+    end
+    function service.tick(userId)
+        if busy[userId] then return nil end
+        local existing = battles[userId]
+        if not existing or existing.status == "ended" then return nil end
+        return guarded(userId, function()
+            local battle, at = battles[userId], now()
+            if battle.status == "resolving" then
+                if at < (battle.nextResolveAt or 0) then return nil end
+                battle.nextResolveAt = at + 1
+                local revision = battle.revision
+                resolve(userId, battle)
+                return if battle.revision ~= revision then result(battle) else nil
+            end
+            local player, enemy = battle.player, battle.enemy
+            local shieldDue = (player.shield > 0 and at >= player.shieldExpiresAt) or (enemy.shield > 0 and at >= enemy.shieldExpiresAt)
+            if at < player.nextAttackAt and at < enemy.nextAttackAt and not shieldDue then return nil end
+            local snapshot = repository.snapshot(userId)
+            if snapshot.status ~= "ok" then
+                battle.player.nextAttackAt = at + battle.player.attackInterval
+                battle.enemy.nextAttackAt = at + battle.enemy.attackInterval
+                return nil
+            end
+            local events = {}
+            local changed = expireShield(battle.player, at)
+            changed = expireShield(battle.enemy, at) or changed
+            local first = if battle.player.nextAttackAt == battle.enemy.nextAttackAt then battle.tieSide
+                elseif battle.player.nextAttackAt < battle.enemy.nextAttackAt then "player" else "enemy"
+            for _, side in ipairs({first, if first == "player" then "enemy" else "player"}) do
+                local fighter = battle[side]
+                if battle.status == "active" and at >= fighter.nextAttackAt then
+                    fighter.nextAttackAt = at + fighter.attackInterval
+                    strike(battle, side, "BASIC", events, at)
+                    changed = true
+                end
+            end
+            if not changed then return nil end
             battle.revision += 1
             if battle.status == "ended" then repository.endBattle(userId, battle.battleId) end
             resolve(userId, battle)

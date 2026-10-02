@@ -14,7 +14,7 @@ Creature ID C01–C08 เป็นdefinitionId ไม่ใช่instanceIdข�
 |---|---|
 | SpeciesDefinition | speciesId: Foxling/Shellkin; potentialType: Might/Guard; speciesSkillId: S01/S02; Vitalityเป็นenumสำรองไม่มีSpeciesใช้ |
 | CreatureDefinition | definitionId, displayName, speciesId, element:Fire/Water, rarity:Common/Uncommon/Rare/Epic, baseHP/ATK/DEF/SPD positive integers, growthSkillId |
-| SkillDefinition | skillId, compatibility:Species/Element/Universal, allowedSpecies[]หรือallowedElements[], sourceStat:ATK/DEF, multiplier>0, targetDefenseFactor>0, cooldownOwnerTurns=2, shieldFraction0–1 |
+| SkillDefinition | skillId, compatibility:Species/Element/Universal, allowedSpecies[]หรือallowedElements[], sourceStat:ATK/DEF, multiplier>0, targetDefenseFactor>0, cooldownSeconds=6, shieldFraction0–1 |
 | Economy/ProgressionConfig | ราคา/grants/capacities/XPthresholdsตามD-16/D-17 |
 | MixingConfig | Base table, rarity probabilities, parent/world weight factors, skillweights, potentialสูตรตามDomain |
 | WorldConfig | rulesVersion, epochUnix=0, cycle720, boundaries240/360/600/720 |
@@ -67,7 +67,7 @@ Receipt: operationId, seq, kind, inputFingerprint, committedAt, resultingProfile
 ## Session-only data
 IntentToken: opaque IDผูกplayer/session/action/immutableargs, expiry60s; MixPreviewเพิ่มworldphase/rules/profileVersion. แผนสุ่มไม่ส่งclientก่อนcommit
 
-BattleState: battleId, ownerUserId, creatureId, encounterId=TRAINING, status:active/resolving/ended, revision, roundIndex, roundOrder, lastRoundFirstSide, per-side statSnapshot/currentHP/shieldAmount/shieldExpiryOwnerTurn/ownerTurnIndex/readyTurnBySkillId. ใช้match-local refs player/enemyไม่ใช่UserIdผู้เล่นอื่น. หนึ่งprofileมีactive battleไม่เกิน1
+BattleState: battleId, creatureId, status:active/resolving/ended, revision, startedAt, serverTime, player/enemy snapshots. Fighter: stats/currentHP/shield/shieldExpiresAt/attackInterval/nextAttackAt/skills[{skillId,readyAt,cooldownSeconds}]. Times use server seconds. Battle events contain monotonic seq and at; retain the last 24 for presentation recovery. No round/owner-turn fields. หนึ่งprofileมีactive battleไม่เกิน1.
 
 cachebattleActionผลตามrequestId/revisionระหว่างแมตช์เพื่อกันซ้ำ; disconnectยกเลิกและไม่persistbattle ยกเว้นrewardoperationที่preparedแล้วอยู่ในprofile
 

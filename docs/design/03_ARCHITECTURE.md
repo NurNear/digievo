@@ -5,7 +5,7 @@
 อัปเดต2026-09-11 รอบ13. ใช้ D-01–D-25 ใน [Domain Rules](06_DOMAIN_RULES.md) และ [PRD](01_PRD_REVIEW.md) เป็นกฎธุรกิจ; แบบต่อไปนี้เป็นแนวทางที่เลือกสำหรับ MVP ยังไม่ใช่ระบบที่สร้างหรือทดสอบแล้ว
 
 ## ขนาดและขอบเขต
-เกมเดียวบนRoblox, ผู้พัฒนาคนเดียว, พื้นที่เล็ก, catalog8ตัว, PvE/manual1ต่อ1. Clientรับinput/แสดงUIและanimation; serverคุมกฎ สุ่ม ต่อสู้ และการเปลี่ยนทรัพยากร. ไม่เพิ่มweb backend/SQL/MemoryStore/queue serviceภายนอกในรุ่นนี้
+เกมเดียวบนRoblox, ผู้พัฒนาคนเดียว, พื้นที่เล็ก, catalog8ตัว, PvE1ต่อ1 โจมตีพื้นฐาน auto พร้อมกดสกิลเอง. Clientรับinput/แสดงUIและanimation; serverคุมกฎ สุ่ม ต่อสู้ และการเปลี่ยนทรัพยากร. ไม่เพิ่มweb backend/SQL/MemoryStore/queue serviceภายนอกในรุ่นนี้
 
 C-28–C-30 ยืนยันคอมพิวเตอร์, ผู้เล่นพร้อมกัน1–4คน, หลุดยกเลิกแมตช์โดยไม่เสียของแล้ว สเปกเครื่องจริงยังไม่ระบุ
 
@@ -75,3 +75,19 @@ ProfileVersionเพิ่มเมื่อdomaincommit ไม่เพิ่�
 คำสั่งเริ่มimplementationยังเป็น O-05; O-01เกี่ยวกับภาพเติบโต, O-02เครื่องวัดperformance, O-03เกณฑ์playtest ไม่ต้องถามข้อdesktop/ผู้เล่น/หลุดซ้ำเพราะยืนยันแล้ว
 
 การเลือกRemoteEventเป็นtransportอ้าง [Roblox Remote events](https://create.roblox.com/docs/scripting/events/remote) ตรวจ2026-09-11; การกันซ้ำ/commitเป็นหน้าที่operationlayerของโครงการ ไม่ใช่คุณสมบัติdurableของtransport
+
+## Real-time combat — 2026-10-02
+Server BattleService.tick runs on a 50 ms local scheduler with independent
+per-fighter deadlines. Speed controls basic attack intervals; clients cannot send
+BASIC. Skill requests apply immediately after validation and set readyAt to
+server time + 6 seconds. Shields absorb one incoming hit or expire after 4 seconds.
+Ticks skip missed intervals after a hitch instead of bursting old attacks. A busy
+reward write blocks only that player's service; other players keep ticking.
+Snapshot revisions order presentation, but an older observed revision does not
+reject an otherwise valid skill in the same battle. Future revisions, other
+battle IDs, locked skills and active cooldowns are rejected. Request IDs retain
+idempotency. Snapshots include a bounded history of 24 sequenced hit events.
+The client merges pushes/responses, ignores duplicates/stale revisions, updates
+HP/countdowns immediately, and plays nonblocking effects. No client auto scheduler
+or turn/round state remains. Disconnect removes the battle; prepared rewards use
+the existing recovery path. This is rulesVersion mvp-1.1.0 for the local prototype.

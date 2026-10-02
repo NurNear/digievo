@@ -176,7 +176,7 @@ function ProfileRepository.new(options)
             check(expectedVersion == state.profile.profileVersion, "STALE_PROFILE")
             if state.intent and state.intent.expiresAt > now() then
                 check(state.intent.kind == kind and state.intent.inputFingerprint == fingerprint and state.intent.expectedProfileVersion == expectedVersion, "INTENT_BUSY")
-                return { status="ok", operationId=state.intent.operationId }
+                return { status="ok", operationId=state.intent.operationId, expiresAt=state.intent.expiresAt }
             end
             local operationId = if kind == "BattleReward" and state.battleId then "reward:" .. state.battleId else options.newId()
             schema.id(operationId)
@@ -187,7 +187,7 @@ function ProfileRepository.new(options)
             local plan = copy(buildPlan(operationId, copy(state.profile), deferred == true))
             schema.apply(state.profile, plan, operationId, kind)
             state.intent = { operationId=operationId, kind=kind, inputFingerprint=fingerprint, expectedProfileVersion=expectedVersion, expiresAt=expiresAt, resultPlan=plan, worldPhaseId=worldPhaseId, buildPlan=if deferred then buildPlan else nil, validatePlan=validatePlan }
-            return { status="ok", operationId=operationId }
+            return { status="ok", operationId=operationId, expiresAt=expiresAt }
         end)
     end
 

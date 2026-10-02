@@ -1,7 +1,9 @@
 {
   "name": "RobloxMVP_LocalTest",
   "serveAddress": "127.0.0.1",
-  "servePlaceIds": [0],
+  "servePlaceIds": [
+    0
+  ],
   "tree": {
     "$className": "DataModel",
     "Workspace": {
@@ -10,17 +12,37 @@
         "$className": "Part",
         "$properties": {
           "Anchored": true,
-          "Size": [160, 1, 160],
-          "Position": [0, -0.5, 0],
-          "Color": [0.32, 0.48, 0.38]
+          "Size": [
+            160,
+            1,
+            160
+          ],
+          "Position": [
+            0,
+            -0.5,
+            0
+          ],
+          "Color": [
+            0.32,
+            0.48,
+            0.38
+          ]
         }
       },
       "Spawn": {
         "$className": "SpawnLocation",
         "$properties": {
           "Anchored": true,
-          "Size": [8, 1, 8],
-          "Position": [0, 0.5, 0],
+          "Size": [
+            8,
+            1,
+            8
+          ],
+          "Position": [
+            0,
+            0.5,
+            0
+          ],
           "Neutral": true
         }
       }
@@ -44,6 +66,15 @@
       },
       "BattleTests": {
         "$path": "tests/Battle.spec.luau"
+      },
+      "JourneyTests": {
+        "$path": "tests/Journey.spec.luau"
+      },
+      "BattleFeedTests": {
+        "$path": "tests/BattleFeed.spec.luau"
+      },
+      "SafetyTests": {
+        "$path": "tests/Safety.spec.luau"
       }
     },
     "ReplicatedStorage": {

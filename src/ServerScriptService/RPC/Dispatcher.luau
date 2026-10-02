@@ -30,7 +30,7 @@ local function stable(value: any, depth, seen, budget)
     local kind = type(value)
     if kind == "nil" or kind == "boolean" or kind == "number" or kind == "string" then
         if kind == "number" and (value ~= value or math.abs(value) == math.huge) then fail("INVALID_INPUT") end
-        return kind .. ":" .. tostring(value)
+        return if kind == "string" then "string:" .. #value .. ":" .. value else kind .. ":" .. tostring(value)
     end
     if kind ~= "table" then fail("INVALID_INPUT") end
     if seen[value] then fail("INVALID_INPUT") end
@@ -39,9 +39,14 @@ local function stable(value: any, depth, seen, budget)
     for key in pairs(value) do
         local keyType = type(key)
         if keyType ~= "string" and keyType ~= "number" then fail("INVALID_INPUT") end
+        budget.entries = (budget.entries or 0) + 1
+        if budget.entries > 256 then fail("INVALID_INPUT") end
         table.insert(keys, key)
     end
-    table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+    table.sort(keys, function(a, b)
+        if type(a) ~= type(b) then return type(a) < type(b) end
+        return a < b
+    end)
     local parts = { "table{" }
     for _, key in ipairs(keys) do
         table.insert(parts, stable(key, depth + 1, seen, budget) .. "=" .. stable(value[key], depth + 1, seen, budget) .. ";")
@@ -84,7 +89,7 @@ function Dispatcher.new(options)
     local clock = options.clock
     local operationBuilders = options.operationBuilders or {}
     local operationParams = {}
-    local replay, buckets, operationFingerprints = {}, {}, {}
+    local replay, buckets, operationFingerprints, ingress = {}, {}, {}, {}
     local service = {}
 
     local function now()
@@ -121,6 +126,18 @@ function Dispatcher.new(options)
             response.error = { code = result.code or "INVALID_INPUT", messageKey = "error." .. string.lower(result.code or "invalid_input"), retry = policy[1], retryAfterMs = policy[2] }
         end
         return response
+    end
+
+    -- Runs before envelope traversal, serialization and replay responses, so
+    -- malformed/unknown/replayed requests cannot bypass the per-player budget.
+    local function admit(userId)
+        local current = now()
+        local bucket = ingress[userId] or {tokens = 40, at = current}
+        bucket.tokens = math.min(40, bucket.tokens + math.max(0, current - bucket.at) * 20)
+        bucket.at = current
+        ingress[userId] = bucket
+        if bucket.tokens < 1 then fail("RATE_LIMITED", "later", 500) end
+        bucket.tokens -= 1
     end
 
     local function throttle(userId, action)
@@ -178,8 +195,8 @@ function Dispatcher.new(options)
         end else nil)
         if issued.status ~= "ok" then return issued end
         operationFingerprints[issued.operationId] = fingerprint
-        operationParams[issued.operationId] = { userId = userId, kind = args.kind, params = args.params }
-        return { status = "ok", data = { operationId = issued.operationId, expiresAt = now() + 60 }, profile = snapshot.profile }
+        operationParams[issued.operationId] = operationParams[issued.operationId] or { userId = userId, kind = args.kind, params = args.params, expiresAt = issued.expiresAt }
+        return { status = "ok", data = { operationId = issued.operationId, expiresAt = issued.expiresAt }, profile = snapshot.profile }
     end
 
     function handlers.Operation_Execute(userId, args)
@@ -200,6 +217,7 @@ function Dispatcher.new(options)
                 options.validateExecute(userId, meta.kind, meta.params)
             end
         end
+        meta.executionRequested = true
         local executed = repository.execute(userId, args.operationId, fingerprint)
         return executed
     end
@@ -208,19 +226,23 @@ function Dispatcher.new(options)
         exactFields(args, { operationId = true })
         assertId(args.operationId)
         local snapshot = sessions.snapshot(userId)
+        -- Observe the backend before deciding an uncertain operation did not
+        -- commit. Recovery can finish a PREPARED plan without rerolling it.
+        if snapshot.status == "pending" then snapshot = repository.recover(userId) end
         if snapshot.status ~= "ok" then return snapshot end
         for _, receipt in ipairs(snapshot.profile.receipts) do
-            if receipt.operationId == args.operationId then
-                return { status = "committed", receipt = receipt }
-            end
+            if receipt.operationId == args.operationId then return { status = "committed", receipt = receipt } end
         end
         if snapshot.profile.preparedOperation and snapshot.profile.preparedOperation.operationId == args.operationId then
             return { status = "prepared", operationId = args.operationId }
         end
-        if operationParams[args.operationId] and operationParams[args.operationId].userId == userId then
-            return { status = "pending", code = "OPERATION_PENDING" }
-        end
-        return { status = "rejected", code = "STALE_OPERATION" }
+        local meta = operationParams[args.operationId]
+        if not meta or meta.userId ~= userId then return { status = "rejected", code = "STALE_OPERATION" } end
+        if now() >= meta.expiresAt then return {status = "rejected", code = "EXPIRED_INTENT"} end
+        -- Only resume an Execute the client already requested. Merely inspecting
+        -- an issued token does not start it. Reuse its frozen plan and validation.
+        if meta.executionRequested then return handlers.Operation_Execute(userId, args) end
+        return { status = "pending", code = "OPERATION_PENDING" }
     end
 
     local actionMap = {
@@ -243,12 +265,16 @@ function Dispatcher.new(options)
         local requestId = "unknown"
         local ok, response = pcall(function()
             if not isFiniteInteger(userId, 1, 9007199254740991) then fail("INVALID_INPUT") end
+            if type(request) == "table" and type(request.requestId) == "string" and #request.requestId <= 128 then requestId = request.requestId end
+            admit(userId)
             exactFields(request, { apiVersion = true, requestId = true, action = true, args = true })
             if request.apiVersion ~= 1 then fail("UNSUPPORTED_VERSION") end
             assertId(request.requestId)
             assertId(request.action)
             if type(request.args) ~= "table" then fail("INVALID_INPUT") end
             requestId = request.requestId
+            local handler = actionMap[request.action]
+            if not handler then fail("INVALID_INPUT") end
             local fingerprint = stable(request)
             replay[userId] = replay[userId] or {}
             local cached = replay[userId][request.requestId]
@@ -257,8 +283,6 @@ function Dispatcher.new(options)
                 return cached.response
             end
             throttle(userId, request.action)
-            local handler = actionMap[request.action]
-            if not handler then fail("INVALID_INPUT") end
             local result = handler(userId, request.args)
             local converted = convert(request.requestId, result, result.data)
             replay[userId][request.requestId] = { fingerprint = fingerprint, response = converted }
@@ -271,7 +295,7 @@ function Dispatcher.new(options)
     end
 
     function service.forget(userId)
-        replay[userId] = nil
+        replay[userId], ingress[userId] = nil, nil
         if options.mix then options.mix.forget(userId) end
         if options.battle then options.battle.forget(userId) end
         for id, meta in pairs(operationParams) do

@@ -1,10 +1,10 @@
 # Development Tasks — v1.0
 
-ผู้ใช้สั่งเริ่ม I-00 และให้เดินต่อวันที่ 2026-09-12 แล้ว ปัจจุบันพัฒนาถึง I-06 ต่อสู้และ progression แบบทดสอบในเครื่อง (2026-09-16); CLI ผ่านแล้ว แต่ I-06 ยังรอ Studio Play/manual walkthrough และยังไม่มีการบันทึกออนไลน์. Scope/ข้อเปิด [PRD](01_PRD_REVIEW.md), ตัวเลข [Domain](06_DOMAIN_RULES.md), contracts [API](05_API_SPEC.md)
+ผู้ใช้สั่งเริ่ม I-00 และให้เดินต่อวันที่ 2026-09-12 แล้ว ปัจจุบันพัฒนาถึง I-07 รวม journey/งานภาพต้นแบบแบบทดสอบในเครื่อง (2026-10-02); CLI ผ่านแล้ว แต่ I-06/I-07 ยังรอ Studio Play/manual walkthrough และยังไม่มีการบันทึกออนไลน์. Scope/ข้อเปิด [PRD](01_PRD_REVIEW.md), ตัวเลข [Domain](06_DOMAIN_RULES.md), contracts [API](05_API_SPEC.md)
 
 ## I-00: เริ่มแล้ว 2026-09-12
 - คำสั่งผู้ใช้เริ่ม I-00 ปิด O-05 และแทนสถานะ T-06 ที่ยังไม่อนุญาตในบันทึก Discovery เดิมด้านล่าง
-- ยึด MVP baseline v1.0: พื้นที่เล็ก, catalog 8 ตัว, ไข่/ฟัก/คอลเลกชัน, ผสมพร้อม preview/inheritance, Level/Growth, PvE manual 1 ต่อ 1, World Condition และ profile/recovery
+- ยึด MVP baseline v1.0: พื้นที่เล็ก, catalog 8 ตัว, ไข่/ฟัก/คอลเลกชัน, ผสมพร้อม preview/inheritance, Level/Growth, PvE 1 ต่อ 1 (ปรับเป็น realtime auto + immediate skill cooldown วินาที ตามคำสั่ง 2026-10-02), World Condition และ profile/recovery
 - คงงานนอก MVP และ O-01 ถึง O-04 ตาม PRD
 - เริ่มพัฒนาจาก place ใหม่ในเครื่อง ไม่บันทึกทับ place จริง; เปิด Studio อย่างเดียวไม่ถือว่าสร้างหรือเชื่อม place แล้ว
 - ก่อนทดสอบข้อมูลออนไลน์ ใช้ test experience แยกจาก production และบันทึก UniverseId/PlaceId ที่ตรวจสอบแล้ว ปัจจุบันยังไม่ได้สร้างหรือยืนยัน ID และยังไม่ publish
@@ -68,6 +68,37 @@
 - Regression I-01–I-05 ผ่าน; analyzer/syntax/Rojo build ผ่าน ตาม [รายงาน I-06](../testing/I-06_RESULTS.md)
 - ยังไม่ยืนยัน Studio Play/UI/manual battle walkthrough, multi-client, DataStore จริงหรือ performance; I-06 ยังไม่ปิดครบด้านเล่นจริง งานถัดจากนั้นคือ I-07 รวม journey/งานภาพ
 
+## I-07: รวม journey และงานภาพต้นแบบ (local implementation, 2026-10-02)
+- UI 4 แท็บพร้อมคำแนะนำขั้นถัดไปตาม inventory/เหรียญ/lock/capacity/pending; กดคำแนะนำเพื่อเปิดแท็บที่เกี่ยวข้อง ไม่มีการบังคับลำดับเล่น
+- รูปทรงกล่องฐานจิ้งจอก/เต่าแยกกันชัดเจน พร้อมสีและลายครบ 8 definitions ใช้โมเดลเดียวกันในคอลเลกชัน ผลฟัก/ผสม และสนามต่อสู้
+- สนาม ViewportFrame แสดงพุ่งโจมตี แสงกระทบ HP/โล่ และผลแพ้ชนะตาม event ฝั่ง server; ระหว่างแสดงผลพักปุ่มและ snapshot push
+- เพิ่มทางเดิน จุดกด E เก็บไข่/เลือกสัตว์เลี้ยงฝึก และแสงกลางวัน/กลางคืน/ฝนตาม world phase; B เปิดปิดเมนู, 1–3 ใช้สกิลทันทีเมื่อเปิดแท็บต่อสู้; โจมตีพื้นฐาน auto
+- แสดงชื่อไทย สกิล/เงื่อนไขปลดล็อกเลเวล 5 stats และ result card หลัง committed เท่านั้น
+- I-07 CLI ผ่าน 143 checks (guide transitions/boundaries/visual catalog), I-01–I-06 regression ผ่าน; compiler/analyzer/build ผ่าน รายละเอียด [รายงาน I-07](../testing/I-07_RESULTS.md)
+- ยังไม่ปิด I-07 ครบ: Studio rendering/input/full journey ยังไม่ยืนยัน, O-01 รูปลักษณ์เติบโต/evo ยังเปิดอยู่; ชุดนี้เป็นภาพต้นแบบทุกเลเวล ไม่ใช่งานภาพ final
+- I-08 local fault suite ผ่านตามสถานะด้านล่าง; online/two-server ต้องมี test experience ที่ตรวจ IDs ก่อนตาม I-00
+
+## I-08: Fault/data safety (local verification, 2026-10-02)
+- ผ่าน 27,680 checks / 2,000 fault scenarios ด้วย memory backend จำลอง; hatch/mix/reward ครบ 5 จุดผิดพลาด จุดละ 100 ครั้ง
+- แก้ Operation.Get ให้ฟื้น prepared operation และ retry งานที่เคย Execute แล้วเมื่อ backend กลับมา; intent ที่ยังไม่ execute จะไม่เริ่มงานจากการอ่านสถานะ
+- คืน expiresAt เดิมเมื่อ reuse intent และ reject intent ที่หมดอายุโดยไม่มี prepared/receipt แทน pending ไม่สิ้นสุด
+- เพิ่ม ingress bucket ก่อนตรวจ/serialize/replay คำขอ รวม unknown routes; จำกัดจำนวน entries และใช้ fingerprint string ระบุความยาว
+- ทดสอบ takeover/fencing, outage เกิน lease, สำเนา schema ที่ไม่รองรับ, disconnect/reward recovery, projected size และ request flood ตาม [I-08 results](../testing/I-08_RESULTS.md)
+- ยังไม่ปิด I-08 ทั้งหมด: ต้องทดสอบ DataStore จริง/สองเซิร์ฟเวอร์และ migration rehearsal เมื่อมี migration; schema ปัจจุบันรองรับ version 1 เท่านั้น การ reject สำเนา version 99 ไม่ใช่ผล migration
+
+## Realtime battle — คำสั่งล่าสุด 2026-10-02 (แทน auto แบบเทิร์นเดิม)
+- ยกเลิก turn-based ทั้งหมด; server timer คุม basic ของแต่ละฝั่งแยกกันตาม Speed
+- กดสกิลใช้ทันที cooldown 6 วินาที; โล่หมดหลัง 4 วินาทีหรือรับหนึ่ง hit
+- ถอด client AutoBattle scheduler และคิวสกิล; UI รับ server push แล้วแสดง HP/เอฟเฟกต์แบบไม่บล็อกการกด
+- rulesVersion mvp-1.1.0; บันทึก I-06 เดิมเป็นประวัติ ระบบปัจจุบันยึด [Realtime results](../testing/REALTIME_RESULTS.md)
+- Battle/RPC 178 checks, feed 11 checks, regression I-01–I-07 ผ่าน; ยังรอ Studio walkthrough
+
+## World arena — WORLD AUTO v2 (2026-10-02)
+- ภาพต่อสู้ย้ายจาก ViewportFrame ในเมนูไป Workspace บนแท่น TrainingArena พร้อม HP เหนือตัวและดาเมจลอย
+- ปุ่มสกิล/แถบคูลดาวน์อยู่ HUD ล่างจอ ใช้ 1–3 ได้แม้เมนูซ่อน; เริ่มสู้จัดกล้องเข้าสนาม จบคืนกล้อง/เมนู
+- ใช้ไฟล์ `build/Digievo_WORLD_AUTO_v2.rbxlx` และป้าย WORLD AUTO v2 เพื่อแยกจาก place รุ่นเก่าที่มี F/รอบ
+- Battle 178/feed 11 checks และ build ผ่าน; visual/input ใน Studio ยังรอทดสอบ
+
 ## Discovery status
 T-00สำรวจเสร็จ; T-01ผู้ใช้/journeyเสร็จ; T-02scopeทดลองยืนยันโดยมีO-01; T-03มีcatalog/economy/worldbaselineครบแต่ยังไม่playtest; T-04มีarchitecture/schema/contractsฉบับรวมและNFRร่าง; T-05แตกงานเสร็จ. T-06 เริ่ม implementation ตามคำสั่งผู้ใช้แล้ว
 
@@ -102,6 +133,6 @@ I-05/I-06ทำได้แยกหลังdependencyแต่ไม่มี�
 | schemaใหม่ไม่รองรับ/oversize | หยุดและแจ้งตรวจ ไม่ทับหรือtruncateข้อมูล |
 
 ## เกณฑ์จบและข้อจำกัด
-ก่อนให้ลูกเล่น: ไม่มีbugทำข้อมูลเสีย/ซ้ำ, corejourneyครบ, phase/cooldownตรง, เครื่องทดสอบบันทึก, ไม่มีงานpublishที่ทำโดยไม่มีคำสั่ง. หลังทดลองจึงเลือกปรับ/ทำต่อ/หยุด ไม่ขยายบอส/PvP/autoเอง
+ก่อนให้ลูกเล่น: ไม่มีbugทำข้อมูลเสีย/ซ้ำ, corejourneyครบ, phase/cooldownตรง, เครื่องทดสอบบันทึก, ไม่มีงานpublishที่ทำโดยไม่มีคำสั่ง. หลังทดลองจึงเลือกปรับ/ทำต่อ/หยุด ไม่ขยายบอส/PvPเอง; basic auto ได้รับคำสั่งผู้ใช้แล้ว 2026-10-02
 
-บันทึกออกแบบเดิมตรวจ 144 random cases, สูตร damage/XP และเอกสารเท่านั้น; สถานะ implementation/การทดสอบปัจจุบันให้ยึด I-01–I-06 และรายงานแต่ละขั้นด้านบน. Online durable fault, multi-client/load/FPS และ playtest เต็มวงจรยังค้าง
+บันทึกออกแบบเดิมตรวจ 144 random cases, สูตร damage/XP และเอกสารเท่านั้น; สถานะ implementation/การทดสอบปัจจุบันให้ยึด I-01–I-07 และรายงานแต่ละขั้นด้านบน. Online durable fault, multi-client/load/FPS และ playtest เต็มวงจรยังค้าง

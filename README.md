@@ -14,18 +14,34 @@ https://github.com/NurNear/digievo
 ## Local Test Place
 
 Current local scope includes I-01 domain rules, I-02 profile/recovery, I-03 RPC,
-I-04 egg/collection, I-05 mixing, and I-06 training battles/progression.
+I-04 egg/collection, I-05 mixing, I-06 training battles/progression, and
+I-07 guided journey/prototype visuals.
 The Thai UI supports collecting at three nodes, buying/hatching eggs, locking
 creatures, claiming pending eggs, and previewing/confirming a 20-coin mix.
-Walk to the blue training pad and choose a creature's training button. Select
-BASIC or an unlocked skill each turn; Speed, owner-turn cooldowns and shields are
-resolved by the server. Winning grants 20 coins, 20 XP (up to the cap), one win
+Walk to the blue training pad and choose a creature's training button. Combat is
+real-time: the server schedules each fighter's basic attacks independently.
+Click a skill (or press 1–3) to cast immediately, with a **6-second cooldown**.
+Speed determines attack interval: `max(1, 2.4 - Speed * 0.025)` seconds.
+Wave Guard lasts four seconds or one incoming hit. There are no rounds, queued
+skills or client-driven basic commands. Hiding the menu does not pause combat. Winning grants 20 coins, 20 XP (up to the cap), one win
 of Potential progress, and a guaranteed first victory egg (20% thereafter).
+The UI has Pets, Eggs, Mix and Battle tabs, a next-step guide and a result card
+with the hatched/mixed pet and skills. Box fox/turtle models have eight variants
+shared by collection portraits and pets fighting directly on the blue world pad.
+The menu closes when combat starts; a temporary arena camera frames the pets,
+HP bars float above them, and skill buttons/countdown bars stay at the bottom
+of the screen. The normal camera returns three seconds after the result. Press **B** to
+show/hide the menu, **E** near an egg node or training pad, **1–3** to cast available battle skills. Skill shortcuts work whenever the combat HUD is visible, even with the menu
+hidden; typing in chat does not trigger them. Basic attacks need no input.
 Full egg inventories keep battle rewards pending. Losing or forfeiting costs
 nothing. Locked creatures can train. Economic actions wait until combat and
 reward confirmation finish.
 
 Stopping Play discards the test profile; cloud persistence remains disabled.
+Current real-time combat checks and the Studio walkthrough are in
+[Real-time combat verification](docs/testing/REALTIME_RESULTS.md).
+I-07 verification and the remaining manual walkthrough are in
+[I-07 verification](docs/testing/I-07_RESULTS.md).
 I-06 CLI verification and the Studio walkthrough are documented in
 [I-06 verification](docs/testing/I-06_RESULTS.md). Studio Play/manual battle
 verification is still pending; the prior I-05 walkthrough is recorded in
@@ -39,8 +55,11 @@ On this Intel Mac:
 .tools/luau-0.738/luau tests/eggs-run.luau
 .tools/luau-0.738/luau tests/mix-run.luau
 .tools/luau-0.738/luau tests/battle-run.luau
-.tools/rojo-7.7.0/rojo build default.project.json -o build/RobloxMVP_LocalTest.rbxlx
-open -a RobloxStudio build/RobloxMVP_LocalTest.rbxlx
+.tools/luau-0.738/luau tests/journey-run.luau
+.tools/luau-0.738/luau tests/battle-feed-run.luau
+.tools/luau-0.738/luau tests/safety-run.luau
+.tools/rojo-7.7.0/rojo build default.project.json -o build/Digievo_WORLD_AUTO_v2.rbxlx
+open -a RobloxStudio build/Digievo_WORLD_AUTO_v2.rbxlx
 ```
 
 Press Play, hatch the starter egg, walk near a gold node and collect another.
@@ -50,9 +69,15 @@ are ignored by Git; Luau 0.738 was built from source for Intel macOS.
 
 Rojo is pinned in `aftman.toml` to the stable 7.7.0 version.
 
+I-08 local data-safety verification passes 27,680 checks across 2,000 simulated
+fault scenarios; see [I-08 results](docs/testing/I-08_RESULTS.md). To run this
+heavier suite inside the unpublished Studio harness, set the Workspace boolean
+attribute `RunSafetyTests` to `true` before Play. It is disabled by default.
+Real DataStore, two-server and migration rehearsals remain pending.
+
 ```powershell
 New-Item -ItemType Directory -Path build -Force
-rojo build default.project.json -o build/RobloxMVP_LocalTest.rbxlx
+rojo build default.project.json -o build/Digievo_WORLD_AUTO_v2.rbxlx
 rojo serve
 ```
 

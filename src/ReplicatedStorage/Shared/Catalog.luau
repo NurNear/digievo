@@ -1,7 +1,7 @@
 --!strict
 -- Baseline v1.0: docs/design/06_DOMAIN_RULES.md, D-01 through D-22.
 local catalog = {
-    rulesVersion = "mvp-1.0.0",
+    rulesVersion = "mvp-1.1.0",
     rarities = { "Common", "Uncommon", "Rare", "Epic" },
     species = {
         Foxling = { potentialType = "Might", speciesSkillId = "S01" },
@@ -18,13 +18,13 @@ local catalog = {
         { definitionId = "C08", displayName = "เต่าลาวา", speciesId = "Shellkin", element = "Fire", rarity = "Epic", baseHP = 110, baseATK = 24, baseDEF = 34, baseSPD = 6, growthSkillId = "F01" },
     },
     skills = {
-        BASIC = { compatibility = "Universal", inheritable = false, sourceStat = "atk", multiplier = 1, targetDefenseFactor = 1, cooldownOwnerTurns = 0, shieldFraction = 0 },
-        S01 = { compatibility = "Species", allowedSpecies = { "Foxling" }, inheritable = false, sourceStat = "atk", multiplier = 1.25, targetDefenseFactor = 1, cooldownOwnerTurns = 2, shieldFraction = 0 },
-        S02 = { compatibility = "Species", allowedSpecies = { "Shellkin" }, inheritable = false, sourceStat = "def", multiplier = 1.10, targetDefenseFactor = 1, cooldownOwnerTurns = 2, shieldFraction = 0 },
-        U01 = { compatibility = "Universal", inheritable = true, sourceStat = "atk", multiplier = 1.15, targetDefenseFactor = 0.5, cooldownOwnerTurns = 2, shieldFraction = 0 },
-        U02 = { compatibility = "Universal", inheritable = true, sourceStat = "atk", multiplier = 1.35, targetDefenseFactor = 1, cooldownOwnerTurns = 2, shieldFraction = 0 },
-        F01 = { compatibility = "Element", allowedElements = { "Fire" }, inheritable = true, sourceStat = "atk", multiplier = 1.50, targetDefenseFactor = 1, cooldownOwnerTurns = 2, shieldFraction = 0 },
-        W01 = { compatibility = "Element", allowedElements = { "Water" }, inheritable = true, sourceStat = "atk", multiplier = 1.10, targetDefenseFactor = 1, cooldownOwnerTurns = 2, shieldFraction = 0.08 },
+        BASIC = { compatibility = "Universal", inheritable = false, sourceStat = "atk", multiplier = 1, targetDefenseFactor = 1, cooldownSeconds = 0, shieldFraction = 0 },
+        S01 = { compatibility = "Species", allowedSpecies = { "Foxling" }, inheritable = false, sourceStat = "atk", multiplier = 1.25, targetDefenseFactor = 1, cooldownSeconds = 6, shieldFraction = 0 },
+        S02 = { compatibility = "Species", allowedSpecies = { "Shellkin" }, inheritable = false, sourceStat = "def", multiplier = 1.10, targetDefenseFactor = 1, cooldownSeconds = 6, shieldFraction = 0 },
+        U01 = { compatibility = "Universal", inheritable = true, sourceStat = "atk", multiplier = 1.15, targetDefenseFactor = 0.5, cooldownSeconds = 6, shieldFraction = 0 },
+        U02 = { compatibility = "Universal", inheritable = true, sourceStat = "atk", multiplier = 1.35, targetDefenseFactor = 1, cooldownSeconds = 6, shieldFraction = 0 },
+        F01 = { compatibility = "Element", allowedElements = { "Fire" }, inheritable = true, sourceStat = "atk", multiplier = 1.50, targetDefenseFactor = 1, cooldownSeconds = 6, shieldFraction = 0 },
+        W01 = { compatibility = "Element", allowedElements = { "Water" }, inheritable = true, sourceStat = "atk", multiplier = 1.10, targetDefenseFactor = 1, cooldownSeconds = 6, shieldFraction = 0.08 },
     },
     rarityProbabilities = {
         Common = { Common = 0.90, Uncommon = 0.09, Rare = 0.01 },
@@ -32,6 +32,7 @@ local catalog = {
         Rare = { Rare = 0.90, Epic = 0.10 },
         Epic = { Epic = 1 },
     },
+    combat = {baseAttackSeconds = 2.4, speedSecondsPerPoint = 0.025, minAttackSeconds = 1, shieldSeconds = 4},
     progression = {
         xpThresholds = { 0, 20, 40, 60, 80, 120, 180, 260, 360, 480 },
         levelCap = 10, xpCap = 480, growthLevel = 5,

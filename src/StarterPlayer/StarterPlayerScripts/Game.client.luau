@@ -1,3 +1,4 @@
+local metrics = require(game:GetService("ReplicatedStorage"):WaitForChild("Diagnostics"):WaitForChild("StudioMetrics")).start("client")
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local presentation = game:GetService("ReplicatedStorage"):WaitForChild("Presentation")
@@ -138,7 +139,10 @@ local skillNames = {S01 = "ตะปบ", S02 = "กระแทกกระด�
 local errors = {EXPIRED_INTENT = "รายการหมดอายุ กรุณาดูโอกาสและยืนยันใหม่", STALE_PREVIEW = "ตัวอย่างหมดอายุหรือข้อมูลเปลี่ยน กรุณาดูโอกาสใหม่", CREATURE_LOCKED = "ปลดล็อกตัวละครก่อนผสม", CREATURE_NOT_FOUND = "ไม่พบตัวละครต้นทาง กรุณาเลือกใหม่", IN_BATTLE = "รอให้การต่อสู้จบก่อน", OUT_OF_RANGE = "เดินเข้าใกล้จุดเก็บไข่หรือสนามฝึก (ไม่เกิน 12 studs)", NODE_UNAVAILABLE = "จุดนี้ยังไม่พร้อม รอครบ 90 วินาที", INSUFFICIENT_FUNDS = "เหรียญไม่พอ", NO_EGG = "ยังไม่มีไข่", CAPACITY_FULL = "ช่องเก็บเต็ม", NOTHING_TO_CLAIM = "ไม่มีไข่รอรับ", RATE_LIMITED = "ทำรายการเร็วเกินไป กรุณารอสักครู่", STALE_PROFILE = "ข้อมูลเปลี่ยนแล้ว กรุณาลองใหม่", INTENT_BUSY = "มีรายการรอยืนยัน รอสักครู่แล้วลองใหม่"}
 remotes.GameResponse.OnClientEvent:Connect(function(response)
     local slot = pending[response.requestId]
-    if slot then slot.response = response end
+    if slot and not slot.response then
+        metrics.record("rpcMs." .. slot.action .. "." .. tostring(response.status), (os.clock() - slot.started) * 1000)
+        slot.response = response
+    end
 end)
 errors.PROFILE_NOT_READY = "ยังโหลดข้อมูลไม่สำเร็จ • กำลังรอตรวจสถานะ"
 errors.PROFILE_INVALID = "ข้อมูลมีปัญหา • หยุดรายการไว้เพื่อตรวจสอบ"
@@ -151,7 +155,7 @@ errors.BATTLE_ENDED = "แมตช์จบแล้ว"
 errors.OPERATION_BUSY = "มีรายการค้างอยู่ รอให้เสร็จหรือหมดอายุก่อนเข้าสนาม"
 local function request(action, args)
     local id = HttpService:GenerateGUID(false)
-    local slot = {}
+    local slot = {started = os.clock(), action = action}
     pending[id] = slot
     local envelope = {apiVersion = 1, requestId = id, action = action, args = args or {}}
     -- Retransmit the identical request ID if transport loses the response.

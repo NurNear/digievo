@@ -102,6 +102,12 @@
 ## Discovery status
 T-00สำรวจเสร็จ; T-01ผู้ใช้/journeyเสร็จ; T-02scopeทดลองยืนยันโดยมีO-01; T-03มีcatalog/economy/worldbaselineครบแต่ยังไม่playtest; T-04มีarchitecture/schema/contractsฉบับรวมและNFRร่าง; T-05แตกงานเสร็จ. T-06 เริ่ม implementation ตามคำสั่งผู้ใช้แล้ว
 
+## I-09: เครื่องมือวัด performance (2026-10-02)
+- เพิ่ม opt-in `MeasurePerformance` ใน Studio: frame interval, RPC response แยก action/status, dispatcher, memory join และขนาด JSON ตอน join
+- รายงานทุก 60 วินาที พร้อม count/retained/p95/max/mean; จำกัด 65,536 samples ต่อ series
+- ตรวจสถิติ/compile/build ผ่าน และบันทึกสเปก Mac แล้ว ตาม [I-09 results](../testing/I-09_RESULTS.md)
+- ยังไม่ปิด I-09: ต้องวัดจริง 15 นาที/4 clients และ online durable latency/budget; ตัวเลขจำลองไม่ใช่ผลรับรอง NFR
+
 ## ลำดับพัฒนาและเกณฑ์จบ
 | งาน | Dependency | ผลงานและเกณฑ์จบ | AC/NFR |
 |---|---|---|---|

@@ -4,6 +4,7 @@ local RunService = game:GetService("RunService")
 assert(RunService:IsStudio() and game.GameId == 0 and game.PlaceId == 0, "Local test only: published places are not allowed")
 
 local shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
+local metrics = require(game:GetService("ReplicatedStorage").Diagnostics.StudioMetrics).start("server")
 local Catalog = require(shared:WaitForChild("Catalog"))
 local DomainRules = require(shared:WaitForChild("DomainRules"))
 local Suite = require(game:GetService("ServerStorage"):WaitForChild("DomainRulesTests"))
@@ -191,7 +192,9 @@ end
 remotes.GameRequest.OnServerEvent:Connect(function(player, request)
     local key = active[player]
     if not key then return end
+    local started = os.clock()
     local response = dispatcher.handle(key, request)
+    metrics.record("dispatchMs", (os.clock() - started) * 1000)
     if active[player] ~= key then return end
     remotes.GameResponse:FireClient(player, response)
     publish(player, response)
@@ -219,7 +222,10 @@ local function joined(player)
     -- Negative IDs are reserved for Studio's simulated clients, mapped only in this memory harness.
     local key = if player.UserId > 0 then player.UserId else 9000000000000000 + math.abs(player.UserId)
     active[player] = key
+    local started = os.clock()
     local opened = sessions.join(key)
+    metrics.record("joinMs." .. opened.status, (os.clock() - started) * 1000)
+    if opened.profile then metrics.record("profileBytes", #HttpService:JSONEncode(opened.profile)) end
     player:SetAttribute("ProfileStatus", opened.status)
     if opened.profile then
         player:SetAttribute("TestCoins", opened.profile.coinBalance)

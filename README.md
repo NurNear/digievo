@@ -58,6 +58,7 @@ On this Intel Mac:
 .tools/luau-0.738/luau tests/journey-run.luau
 .tools/luau-0.738/luau tests/battle-feed-run.luau
 .tools/luau-0.738/luau tests/safety-run.luau
+.tools/luau-0.738/luau tests/metrics-run.luau
 .tools/rojo-7.7.0/rojo build default.project.json -o build/Digievo_WORLD_AUTO_v2.rbxlx
 open -a RobloxStudio build/Digievo_WORLD_AUTO_v2.rbxlx
 ```
@@ -115,3 +116,9 @@ origin https://github.com/NurNear/digievo.git
 ```
 
 If the repository is private, GitHub credentials or a personal access token are required before pushing.
+
+## Studio performance measurements
+
+Set Workspace boolean attribute `MeasurePerformance` to true before Play to emit
+local client/server metrics every 60 seconds. See [I-09 procedure and limitations](docs/testing/I-09_RESULTS.md).
+Four-client gameplay performance has not yet been measured.
